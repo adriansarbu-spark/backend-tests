@@ -5,47 +5,9 @@ declare(strict_types=1);
 // Load test config (defines DIR_SYSTEM, PUBLIC_API, etc.) and the controller under test.
 require_once __DIR__ . '/../../../tests_config.php';
 require_once PUBLIC_API . 'signing.php';
+require_once __DIR__ . '/_support/SigningTestDoubles.php';
 
 use PHPUnit\Framework\MockObject\MockObject;
-
-// Define minimal DB_PREFIX for unit tests that hit DB-dependent code paths.
-if (!defined('DB_PREFIX')) {
-    define('DB_PREFIX', '');
-}
-
-if (!class_exists(TestableControllerPublicAPIV1SigningDraft::class)) {
-    class TestableControllerPublicAPIV1SigningDraft extends ControllerPublicAPIV1Signing {
-        // We invoke saveDraftSignature() via reflection to avoid depending on its visibility.
-    }
-}
-
-// In the full suite these may already exist; define only if missing.
-if (!class_exists(TestSigningSignerModel::class)) {
-    class TestSigningSignerModel {
-        public function getSignerBySignCode($signCode) {}
-        public function updateDraftSignature($signCode, $draftSignature) {}
-    }
-}
-
-// In the full suite, TestSigningSignerModel may be defined in another file without updateDraftSignature().
-// Use this subclass in tests that need to mock updateDraftSignature().
-if (!class_exists(TestSigningSignerModelWithDraft::class)) {
-    class TestSigningSignerModelWithDraft extends TestSigningSignerModel {
-        public function updateDraftSignature($signCode, $draftSignature) {}
-    }
-}
-
-if (!class_exists(TestSigningDocumentModel::class)) {
-    class TestSigningDocumentModel {
-        public function getDocumentById($documentId) {}
-    }
-}
-
-if (!class_exists(TestCustomer::class)) {
-    class TestCustomer {
-        public function getRoleId() {}
-    }
-}
 
 beforeEach(function () {
     $registry = new Registry();

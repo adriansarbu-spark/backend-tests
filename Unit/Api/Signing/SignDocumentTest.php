@@ -24,129 +24,7 @@ declare(strict_types=1);
 // Load test config (defines DIR_SYSTEM, PUBLIC_API, etc.) and the controller under test.
 require_once __DIR__ . '/../../../tests_config.php';
 require_once PUBLIC_API . 'signing.php';
-
-// Define minimal DB_PREFIX for unit tests that hit DB-dependent code paths.
-if (!defined('DB_PREFIX')) {
-    define('DB_PREFIX', '');
-}
-
-if (!class_exists(TestableControllerPublicAPIV1Signing::class)) {
-    /**
-     * Test-only subclass that exposes protected/private controller methods
-     * as public so we can call them directly in unit tests without
-     * changing production controller visibility.
-     */
-    class TestableControllerPublicAPIV1Signing extends ControllerPublicAPIV1Signing {
-        public function signDocument($sign_code)
-        {
-            return parent::signDocument($sign_code);
-        }
-    }
-}
-
-if (!class_exists(TestSigningSignerModel::class)) {
-    class TestSigningSignerModel {
-        public function getSignerBySignCode($signCode) {}
-        public function getNextSigner($documentId) {}
-        public function isGroupComplete($documentId, $signingOrder, $parallelGroup) {}
-        public function getNextGroupToInvite($documentId, $signingOrder) {}
-        public function getSignersByDocumentId($documentId) {}
-        public function areAllSignersSigned($documentId) {}
-        public function updateSignerStatus($signerId, $status) {}
-        public function updateSignatureResultAnnotations($signerId, $annotations) {}
-    }
-}
-
-// In the full suite, TestSigningSignerModel may be defined in another file without inviteGroup().
-// Use this subclass in tests that need to mock inviteGroup().
-if (!class_exists(TestSigningSignerModelWithInvite::class)) {
-    class TestSigningSignerModelWithInvite extends TestSigningSignerModel {
-        public function inviteGroup($documentId, $signingOrder, $parallelGroup) {}
-    }
-}
-
-// In the full suite, TestSigningSignerModel may be defined elsewhere without getNextSigner().
-// Use this subclass in tests that need to mock getNextSigner().
-if (!class_exists(TestSigningSignerModelWithNext::class)) {
-    class TestSigningSignerModelWithNext extends TestSigningSignerModel {
-        public function getNextSigner($documentId) {}
-    }
-}
-
-// In the full suite, TestSigningSignerModel may be defined elsewhere without updateSignatureResultAnnotations().
-// Use this fuller subclass for tests that verify post-signing updates.
-if (!class_exists(TestSigningSignerModelFull::class)) {
-    class TestSigningSignerModelFull extends TestSigningSignerModel {
-        public function updateSignerStatus($signerId, $status) {}
-        public function updateSignatureResultAnnotations($signerId, $annotations) {}
-        public function isGroupComplete($documentId, $signingOrder, $parallelGroup) {}
-        public function getNextGroupToInvite($documentId, $signingOrder) {}
-        public function getSignersByDocumentId($documentId) {}
-        public function areAllSignersSigned($documentId) {}
-    }
-}
-
-if (!class_exists(TestSigningSignerModelFullWithInvite::class)) {
-    class TestSigningSignerModelFullWithInvite extends TestSigningSignerModelFull {
-        public function inviteGroup($documentId, $signingOrder, $parallelGroup) {}
-    }
-}
-
-if (!class_exists(TestSigningSignerModelFullWithNext::class)) {
-    class TestSigningSignerModelFullWithNext extends TestSigningSignerModelFull {
-        public function getNextSigner($documentId) {}
-    }
-}
-
-if (!class_exists(TestSigningDocumentModel::class)) {
-    class TestSigningDocumentModel {
-        public function getDocumentById($documentId) {}
-        public function updateCurrentFileCode($documentId, $fileCode) {}
-        public function sendDocument($documentId, $lockToken) {}
-        public function completeDocument($documentId) {}
-    }
-}
-
-// In the full suite, TestSigningDocumentModel may be defined elsewhere without updateCurrentFileCode()/sendDocument()/completeDocument().
-if (!class_exists(TestSigningDocumentModelWithUpdates::class)) {
-    class TestSigningDocumentModelWithUpdates extends TestSigningDocumentModel {
-        public function updateCurrentFileCode($documentId, $fileCode) {}
-        public function sendDocument($documentId, $lockToken) {}
-        public function completeDocument($documentId) {}
-    }
-}
-
-if (!class_exists(TestSigningVisibilityModel::class)) {
-    class TestSigningVisibilityModel {
-        public function isVisible($documentId, $customerRoleId, $email) {}
-        public function updateCustomerRoleId($documentId, $email, $customerRoleId) {}
-        public function createVisibility($documentId, $email, $customerRoleId) {}
-    }
-}
-
-if (!class_exists(TestUploadModel::class)) {
-    class TestUploadModel {
-        public function getUploadByCodeForSigning($code) {}
-        public function addUpload($name, $filename, $arg1, $arg2, $arg3, $customerId, $companyId, $customerRoleId, $folder) {}
-    }
-}
-
-if (!class_exists(TestCustomer::class)) {
-    class TestCustomer {
-        public function getRoleId() {}
-        public function getTotpSecret() {}
-        public function getId() {}
-        public function getCompanyId() {}
-    }
-}
-
-// In the full suite, TestCustomer may be defined elsewhere without getId()/getCompanyId().
-if (!class_exists(TestCustomerWithIds::class)) {
-    class TestCustomerWithIds extends TestCustomer {
-        public function getId() {}
-        public function getCompanyId() {}
-    }
-}
+require_once __DIR__ . '/_support/SigningTestDoubles.php';
 
 use PHPUnit\Framework\MockObject\MockObject;
 use RobThree\Auth\TwoFactorAuth;
@@ -160,6 +38,8 @@ use RobThree\Auth\TwoFactorAuth;
  */
 
 beforeEach(function () {
+    $this->originalTimezone = date_default_timezone_get();
+
     $registry = new Registry();
 
     /** @var TestableControllerPublicAPIV1Signing&MockObject $controller */
@@ -218,6 +98,34 @@ beforeEach(function () {
         ->method('getRoleId')
         ->willReturn(10);
 });
+
+afterEach(function () {
+    if (isset($this->originalTimezone) && is_string($this->originalTimezone) && $this->originalTimezone !== '') {
+        date_default_timezone_set($this->originalTimezone);
+    }
+});
+
+function selectWritableSigningUploadTimezone(): void
+{
+    $candidates = [
+        date_default_timezone_get(),
+        'Pacific/Kiritimati',
+        'Etc/GMT+12',
+    ];
+
+    foreach ($candidates as $timezone) {
+        date_default_timezone_set($timezone);
+        $targetDir = rtrim(DIR_UPLOAD, '/') . '/' . date('Y-m-d');
+
+        if (is_dir($targetDir) && is_writable($targetDir)) {
+            return;
+        }
+
+        if (!is_dir($targetDir) && @mkdir($targetDir, 0777, true)) {
+            return;
+        }
+    }
+}
 
 test('signDocument rejects owner when document status is not DRAFT or PENDING', function () {
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModel::class);
@@ -1066,7 +974,7 @@ test('signDocument returns 500 when DocumentSigner::sign returns false', functio
         public function getUploadByCodeForSigning($code)
         {
             return [
-                'relative_path' => '',
+                'relative_path' => 'unitTests',
                 'filename'      => 'original.pdf',
                 'name'          => 'Original.pdf',
             ];
@@ -1210,7 +1118,7 @@ test('signDocument returns 500 when DocumentSigner::sign throws', function () {
         public function getUploadByCodeForSigning($code)
         {
             return [
-                'relative_path' => '',
+                'relative_path' => 'unitTests',
                 'filename'      => 'original.pdf',
                 'name'          => 'Original.pdf',
             ];
@@ -1242,6 +1150,8 @@ test('signDocument returns 500 when DocumentSigner::sign throws', function () {
 });
 
 test('signDocument performs post-signing updates (new file, status, annotations, visibility role)', function () {
+    selectWritableSigningUploadTimezone();
+
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModelFull::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModelWithUpdates::class);
     $this->controller->model_signing_visibility = $this->createMock(TestSigningVisibilityModel::class);
@@ -1332,7 +1242,7 @@ test('signDocument performs post-signing updates (new file, status, annotations,
         public function getUploadByCodeForSigning($code)
         {
             return [
-                'relative_path' => '',
+                'relative_path' => 'unitTests',
                 'filename'      => 'original.pdf',
                 'name'          => 'Original.pdf',
             ];
@@ -1393,6 +1303,8 @@ test('signDocument performs post-signing updates (new file, status, annotations,
 });
 
 test('signDocument invites next group, sends draft to pending, and creates visibility', function () {
+    selectWritableSigningUploadTimezone();
+
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModelFullWithInvite::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModelWithUpdates::class);
     $this->controller->model_signing_visibility = $this->createMock(TestSigningVisibilityModel::class);
@@ -1474,7 +1386,7 @@ test('signDocument invites next group, sends draft to pending, and creates visib
     $this->controller->model_tool_upload = new class {
         public function getUploadByCodeForSigning($code)
         {
-            return ['relative_path' => '', 'filename' => 'original.pdf', 'name' => 'Original.pdf'];
+            return ['relative_path' => 'unitTests', 'filename' => 'original.pdf', 'name' => 'Original.pdf'];
         }
         public function addUpload($name, $filename, $a, $b, $c, $customerId, $companyId, $customerRoleId, $folder)
         {
@@ -1531,6 +1443,8 @@ test('signDocument invites next group, sends draft to pending, and creates visib
 });
 
 test('signDocument completes document when no next group and all signers are signed', function () {
+    selectWritableSigningUploadTimezone();
+
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModelFull::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModelWithUpdates::class);
     $this->controller->model_signing_visibility = $this->createMock(TestSigningVisibilityModel::class);
@@ -1608,7 +1522,7 @@ test('signDocument completes document when no next group and all signers are sig
     $this->controller->model_tool_upload = new class {
         public function getUploadByCodeForSigning($code)
         {
-            return ['relative_path' => '', 'filename' => 'original.pdf', 'name' => 'Original.pdf'];
+            return ['relative_path' => 'unitTests', 'filename' => 'original.pdf', 'name' => 'Original.pdf'];
         }
         public function addUpload($name, $filename, $a, $b, $c, $customerId, $companyId, $customerRoleId, $folder)
         {
@@ -1643,6 +1557,8 @@ test('signDocument completes document when no next group and all signers are sig
 });
 
 test('signDocument completes document when group not complete but all signers are signed', function () {
+    selectWritableSigningUploadTimezone();
+
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModelFullWithNext::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModelWithUpdates::class);
     $this->controller->model_signing_visibility = $this->createMock(TestSigningVisibilityModel::class);
@@ -1720,7 +1636,7 @@ test('signDocument completes document when group not complete but all signers ar
     $this->controller->model_tool_upload = new class {
         public function getUploadByCodeForSigning($code)
         {
-            return ['relative_path' => '', 'filename' => 'original.pdf', 'name' => 'Original.pdf'];
+            return ['relative_path' => 'unitTests', 'filename' => 'original.pdf', 'name' => 'Original.pdf'];
         }
         public function addUpload($name, $filename, $a, $b, $c, $customerId, $companyId, $customerRoleId, $folder)
         {
