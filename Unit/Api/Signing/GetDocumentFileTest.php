@@ -5,6 +5,7 @@ declare(strict_types=1);
 // Load test config (defines DIR_SYSTEM, PUBLIC_API, etc.) and the controller under test.
 require_once __DIR__ . '/../../../tests_config.php';
 require_once PUBLIC_API . 'signing.php';
+require_once __DIR__ . '/_support/SigningTestDoubles.php';
 
 use PHPUnit\Framework\MockObject\MockObject;
 

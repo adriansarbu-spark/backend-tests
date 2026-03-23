@@ -5,53 +5,10 @@ declare(strict_types=1);
 // Load test config (defines DIR_SYSTEM, PUBLIC_API, etc.) and the controller under test.
 require_once __DIR__ . '/../../../tests_config.php';
 require_once PUBLIC_API . 'signing.php';
+require_once __DIR__ . '/_support/SigningTestDoubles.php';
 
 use PHPUnit\Framework\MockObject\MockObject;
 use RobThree\Auth\TwoFactorAuth;
-
-// Define minimal DB_PREFIX for unit tests that may touch DB-dependent code paths.
-if (!defined('DB_PREFIX')) {
-    define('DB_PREFIX', '');
-}
-
-if (!class_exists(TestableControllerPublicAPIV1SigningReject::class)) {
-    class TestableControllerPublicAPIV1SigningReject extends ControllerPublicAPIV1Signing {
-        public function rejectDocument($sign_code)
-        {
-            return parent::rejectDocument($sign_code);
-        }
-    }
-}
-
-// In the full suite these may already exist; define only if missing.
-if (!class_exists(TestSigningSignerModel::class)) {
-    class TestSigningSignerModel {
-        public function getSignerBySignCode($signCode) {}
-        public function updateSignerStatus($signerId, $status) {}
-    }
-}
-
-if (!class_exists(TestSigningDocumentModel::class)) {
-    class TestSigningDocumentModel {
-        public function getDocumentById($documentId) {}
-        public function rejectDocument($documentId) {}
-    }
-}
-
-// In the full suite, TestSigningDocumentModel may be defined in another file without rejectDocument().
-// Use this subclass in tests that need to mock rejectDocument().
-if (!class_exists(TestSigningDocumentModelWithReject::class)) {
-    class TestSigningDocumentModelWithReject extends TestSigningDocumentModel {
-        public function rejectDocument($documentId) {}
-    }
-}
-
-if (!class_exists(TestCustomer::class)) {
-    class TestCustomer {
-        public function getRoleId() {}
-        public function getTotpSecret() {}
-    }
-}
 
 beforeEach(function () {
     $registry = new Registry();
