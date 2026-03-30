@@ -3,24 +3,6 @@
 declare(strict_types=1);
 
 
-/** Note: to check this part, if there is or no a problem with VIEWED in singing.php file 
- * 
- *    Check document status - owner can sign DRAFT documents, others need PENDING 
-  *      if ($is_owner) {
-  *          if (!in_array($document['lifecycle_status_code'], ['DRAFT', 'PENDING'])) {
-  *              $this->statusCode = 422;
-  *              $this->json['error'][] = 'Document must be in DRAFT or PENDING status to sign';
-  *              return;
-  *          }
-  *      } else {
-  *          if ($document['lifecycle_status_code'] !== 'PENDING') {
-  *              $this->statusCode = 422;
-  *              $this->json['error'][] = 'Document must be in PENDING status to sign';
-  *              return;
-  *          }
-*/
-
-
 // Load test config (defines DIR_SYSTEM, PUBLIC_API, etc.) and the controller under test.
 require_once __DIR__ . '/../../../tests_config.php';
 require_once PUBLIC_API . 'signing.php';
@@ -39,14 +21,19 @@ use RobThree\Auth\TwoFactorAuth;
 
 beforeEach(function () {
     $this->originalTimezone = date_default_timezone_get();
+    selectWritableSigningUploadTimezone();
 
     $registry = new Registry();
 
     /** @var TestableControllerPublicAPIV1Signing&MockObject $controller */
     $this->controller = $this->getMockBuilder(TestableControllerPublicAPIV1Signing::class)
         ->setConstructorArgs([$registry])
-        ->onlyMethods(['sendResponse', 'getPost', 'createDocumentSigner'])
+        ->onlyMethods(['sendResponse', 'getPost', 'createDocumentSigner', 'getUploadRoot'])
         ->getMock();
+
+    $this->controller
+        ->method('getUploadRoot')
+        ->willReturn(rtrim(DIR_UPLOAD, '/\\') . '/testing');
 
     $this->controller->json = [];
     $this->controller->statusCode = null;
@@ -107,6 +94,12 @@ afterEach(function () {
 
 function selectWritableSigningUploadTimezone(): void
 {
+    $uploadRoot = rtrim(DIR_UPLOAD, '/');
+    $isolatedRoot = $uploadRoot . '/testing';
+    if (!is_dir($isolatedRoot)) {
+        @mkdir($isolatedRoot, 0777, true);
+    }
+
     $candidates = [
         date_default_timezone_get(),
         'Pacific/Kiritimati',
@@ -115,13 +108,35 @@ function selectWritableSigningUploadTimezone(): void
 
     foreach ($candidates as $timezone) {
         date_default_timezone_set($timezone);
-        $targetDir = rtrim(DIR_UPLOAD, '/') . '/' . date('Y-m-d');
+        $dateFolder = date('Y-m-d');
+        $isolatedDateDir = $isolatedRoot . '/' . $dateFolder;
+        if (!is_dir($isolatedDateDir) && !@mkdir($isolatedDateDir, 0777, true)) {
+            continue;
+        }
+
+        if (!is_writable($isolatedDateDir)) {
+            continue;
+        }
+
+        $targetDir = $uploadRoot . '/' . $dateFolder;
+
+        if (is_link($targetDir)) {
+            $linkTarget = readlink($targetDir);
+            if ($linkTarget === $isolatedDateDir) {
+                return;
+            }
+            @unlink($targetDir);
+        }
+
+        if (!file_exists($targetDir) && @symlink($isolatedDateDir, $targetDir)) {
+            return;
+        }
 
         if (is_dir($targetDir) && is_writable($targetDir)) {
             return;
         }
 
-        if (!is_dir($targetDir) && @mkdir($targetDir, 0777, true)) {
+        if (!is_dir($targetDir) && @mkdir($targetDir, 0777, true) && is_writable($targetDir)) {
             return;
         }
     }
