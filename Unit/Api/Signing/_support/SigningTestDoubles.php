@@ -8,6 +8,11 @@ if (!defined('DB_PREFIX')) {
 
 if (!class_exists(TestableControllerPublicAPIV1Signing::class)) {
     class TestableControllerPublicAPIV1Signing extends ControllerPublicAPIV1Signing {
+        public function getUploadRoot()
+        {
+            return parent::getUploadRoot();
+        }
+
         public function getDocumentFile($sign_code)
         {
             return parent::getDocumentFile($sign_code);
