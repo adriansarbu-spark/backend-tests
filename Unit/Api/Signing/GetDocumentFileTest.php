@@ -373,34 +373,38 @@ test('getDocumentFile streams PDF when file exists', function () {
         ->method('isVisible')
         ->willReturn(true);
 
-    // Create a real temporary PDF file under DIR_UPLOAD so file_exists() passes.
-    $relativePath = 'unit-test-signing';
-    $folderPath = DIR_UPLOAD . '/' . $relativePath;
-    if (!is_dir($folderPath)) {
-        mkdir($folderPath, 0777, true);
-    }
-    $filename = 'document.pdf';
-    $filePath = DIR_UPLOAD . '/' . $relativePath . '/' . $filename;
-    file_put_contents($filePath, '%PDF-1.4 test');
+    // Create a real temporary PDF under DIR_UPLOAD/{Y-m-d} so file_exists() passes.
+    // DIR_UPLOAD ends with '/'; use a normalized root for mkdir so we do not get upload//Y-m-d.
+    $uploadRoot = rtrim(DIR_UPLOAD, '/');
+    $dateFolder = date('Y-m-d');
+    $filename = 'get-document-file-test-' . bin2hex(random_bytes(4)) . '.pdf';
+    $folderPath = $uploadRoot . '/' . $dateFolder;
+    if(!is_dir($folderPath))
+        if(@mkdir($folderPath, 0775, true))
+            @chmod($folderPath, 0775);
+
+    $filePathOnDisk = $folderPath . '/' . $filename;
+    file_put_contents($filePathOnDisk, '%PDF-1.4 test');
+
+    // signing.php builds path with DIR_UPLOAD . '/' . relative_path . '/' . filename (may contain //).
+    $filePathAsController = DIR_UPLOAD . '/' . $dateFolder . '/' . $filename;
 
     // Stub DB upload lookup to return this file.
-    $this->controller->db = new class($relativePath, $filename, $this) {
-        private string $relativePath;
+    $this->controller->db = new class($dateFolder, $filename) {
+        private string $dateFolder;
         private string $filename;
-        private $testCase;
 
-        public function __construct(string $relativePath, string $filename, $testCase)
+        public function __construct(string $dateFolder, string $filename)
         {
-            $this->relativePath = $relativePath;
+            $this->dateFolder = $dateFolder;
             $this->filename = $filename;
-            $this->testCase = $testCase;
         }
 
         public function query(string $sql)
         {
             return (object)[
                 'row' => [
-                    'relative_path' => $this->relativePath,
+                    'relative_path' => $this->dateFolder,
                     'filename'      => $this->filename,
                     'name'          => 'My Document.pdf',
                 ],
@@ -417,7 +421,7 @@ test('getDocumentFile streams PDF when file exists', function () {
     $this->controller
         ->expects($this->once())
         ->method('streamPdfFile')
-        ->with($filePath, 'My Document.pdf');
+        ->with($filePathAsController, 'My Document.pdf');
 
     // sendResponse should not be used on the happy-path stream.
     $this->controller

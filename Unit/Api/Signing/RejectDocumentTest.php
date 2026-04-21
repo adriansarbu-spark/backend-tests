@@ -21,6 +21,7 @@ beforeEach(function () {
 
     $this->controller->json = [];
     $this->controller->statusCode = null;
+    $this->controller->useremail = 'signer@example.com';
 
     $this->signCode = 'c894afec-2494-4520-a8f3-ae05172356e0';
 
@@ -135,6 +136,7 @@ test('rejectDocument returns 403 when signer customer_role_id does not match aut
         ]);
 
     $this->controller->method('getPost')->willReturn([]);
+    $this->controller->useremail = null;
 
     callRejectDocument($this->controller, $this->signCode);
 
@@ -153,6 +155,7 @@ test('rejectDocument returns 422 when signer status does not allow rejection', f
             'customer_role_id'   => 10,
             'status_code'        => 'SIGNED',
             'document_signer_id' => 5,
+            'email'              => 'signer@example.com',
         ]);
 
     $this->controller->model_signing_document
@@ -182,6 +185,7 @@ test('rejectDocument returns 422 when TOTP code is missing', function () {
             'customer_role_id'   => 10,
             'status_code'        => 'INVITED',
             'document_signer_id' => 5,
+            'email'              => 'signer@example.com',
         ]);
 
     $this->controller->model_signing_document
@@ -211,6 +215,7 @@ test('rejectDocument returns 422 when TOTP secret is missing', function () {
             'customer_role_id'   => 10,
             'status_code'        => 'INVITED',
             'document_signer_id' => 5,
+            'email'              => 'signer@example.com',
         ]);
 
     $this->controller->model_signing_document
@@ -242,6 +247,7 @@ test('rejectDocument returns 422 when TOTP is invalid', function () {
             'customer_role_id'   => 10,
             'status_code'        => 'INVITED',
             'document_signer_id' => 5,
+            'email'              => 'signer@example.com',
         ]);
 
     $this->controller->model_signing_document
@@ -273,6 +279,7 @@ test('rejectDocument updates signer + document and returns success on valid requ
             'customer_role_id'   => 10,
             'status_code'        => 'VIEWED',
             'document_signer_id' => 5,
+            'email'              => 'signer@example.com',
         ]);
 
     $this->controller->model_signing_document
