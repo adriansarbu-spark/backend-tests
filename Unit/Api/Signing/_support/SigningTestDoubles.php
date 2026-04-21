@@ -152,6 +152,8 @@ if (!class_exists(TestCustomerWithIds::class)) {
     class TestCustomerWithIds extends TestCustomer {
         public function getId() {}
         public function getCompanyId() {}
+        public function getFirstName() {}
+        public function getLastName() {}
     }
 }
 

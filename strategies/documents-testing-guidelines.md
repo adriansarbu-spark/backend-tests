@@ -34,7 +34,7 @@ This file contains general steps to write tests in this repository. It focuses o
    - `SigningFlowHelper::sendDocument(...)`
    - `SigningFlowHelper::signWithRetry(...)`
 
-Rule of thumb: tests should describe *what* the system must do, while helpers handle *how* to do the required setup.
+Rule of thumb: tests should describe _what_ the system must do, while helpers handle _how_ to do the required setup.
 
 ---
 
@@ -46,6 +46,7 @@ If you see the same multipart payload, annotation/signers JSON structure, or the
 2. Add a new dedicated helper file under `tests/Support/`.
 
 Keep the test file focused on assertions and flow:
+
 - arrange (helpers)
 - act (HTTP or helper “action”)
 - assert (status and key response fields)
@@ -76,6 +77,7 @@ When testing permissions/authorization:
 4. Assert the error message is present when JSON includes an `error` field.
 
 Examples in this repo:
+
 - owner vs non-owner file access
 - signer endpoints vs UUID endpoints
 - “not allowed to sign/reject” with wrong signer identity
@@ -85,10 +87,12 @@ Examples in this repo:
 ## 7. Assert response shape, not just status code
 
 For successful responses:
+
 1. Assert expected keys exist under `data` (e.g. `data.uuid`, `data.sign_code`).
 2. Assert any expected equality fields (e.g. sign_code matches what you used).
 
 For unsuccessful responses:
+
 1. Assert response status is not the success status.
 2. If response JSON includes `error`, assert `error` is non-empty to avoid false positives.
 
@@ -113,6 +117,10 @@ For unsuccessful responses:
 ## 10. Add/extend helpers only when you have evidence of repetition
 
 Use this decision rule:
+
 1. If you’re about to copy/paste the same payload or setup across 2+ tests, refactor.
 2. If it’s only one test, keep it inline unless it’s already inconsistent with existing helpers.
 
+---
+
+## 11. Do NOT update models or controllers outside of the tests

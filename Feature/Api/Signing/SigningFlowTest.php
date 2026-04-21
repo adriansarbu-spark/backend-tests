@@ -103,6 +103,7 @@ test('signing flow: user1 sends to user2 and user2 can sign', function () {
         'email' => TEST_USER_2_EMAIL,
         'signing_order' => 1,
         'signing_type' => 'SIGNATURE',
+        'uses_prepaid_invite' => true,
         // 'send_email' => true,
         'send_email' => false,  // in reality, this should be true, but we keep it false for now to avoid sending emails
     ]]);
