@@ -45,7 +45,7 @@ test('documents flow: get document as owner', function () {
     expect((string)($ownerGetJson['data']['uuid'] ?? ''))->toBe($uuid);
 });
 
-test('documents flow: get document as other user is forbidden', function () {
+test('documents flow: get document as non-owner is forbidden', function () {
     $manager = getDocumentsFlowManager();
     $apiBase = $manager->getApiBase();
     $uuid = $manager->getUuid();
@@ -55,7 +55,7 @@ test('documents flow: get document as other user is forbidden', function () {
     expect($otherGetStatus)->toBe(403);
 });
 
-test('documents flow: user1 can download own document file', function () {
+test('documents flow: document owner can download their PDF via /file', function () {
     $manager = getDocumentsFlowManager();
     $user1Bearer = $manager->getUser1Bearer();
 
@@ -72,7 +72,7 @@ test('documents flow: user1 can download own document file', function () {
     expect(str_starts_with((string)$fileRaw, '%PDF'), 'Expected /file response to be a PDF. raw=' . $fileDebug)->toBeTrue();
 });
 
-test('documents flow: user1 cannot download user2 document file', function () {
+test('documents flow: non-owner cannot download another account document via /file', function () {
     $manager = getDocumentsFlowManager();
     $user2Bearer = $manager->getUser2Bearer();
     $user1Bearer = $manager->getUser1Bearer();
@@ -86,7 +86,7 @@ test('documents flow: user1 cannot download user2 document file', function () {
     );
 
     $fileDebug = substr((string)$fileRaw, 0, 700);
-    expect($fileStatus, 'Non-owner user1 must not be able to download /file. status=' . $fileStatus . ' raw=' . $fileDebug)->not->toBe(200);
+    expect($fileStatus, 'Non-owner must not be able to download peer document /file. status=' . $fileStatus . ' raw=' . $fileDebug)->not->toBe(200);
     if (is_array($fileJson)) {
         $errorsJoined = implode(' | ', array_map('strval', (array)($fileJson['error'] ?? [])));
         expect($errorsJoined, 'Expected an error message for forbidden file download. raw=' . $fileDebug)->not->toBe('');
@@ -95,17 +95,17 @@ test('documents flow: user1 cannot download user2 document file', function () {
 
 
 if (defined('SKIP_USER_3_FAILED_TESTS') && SKIP_USER_3_FAILED_TESTS) {
-    test('documents flow: user3 without certificate upload qualified document (behavior check)', function () {
-        $this->markTestSkipped('User 3 tests are disabled');
+    test('documents flow: uncertified account qualified upload (behavior check)', function () {
+        $this->markTestSkipped('Uncertified-account upload tests are disabled');
     });
     return;
 }
 
-test('documents flow: user3 without certificate upload qualified document (behavior check)', function () {
+test('documents flow: uncertified account qualified upload (behavior check)', function () {
     $user3Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_3_EMAIL, TEST_USER_3_PASSWORD);
 
     $pdfContent = "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF";
-    $documentName = 'Flow test user3 no cert ' . gmdate('YmdHis');
+    $documentName = 'Flow test uncertified qualified ' . gmdate('YmdHis');
 
     [$status, $json, $raw] = DocumentsApiHelper::uploadDocumentForFlow(
         $user3Bearer,
@@ -122,7 +122,7 @@ test('documents flow: user3 without certificate upload qualified document (behav
     $debug = "Status={$status}\nJSON:\n{$jsonText}\nRAW:\n" . substr((string)$raw, 0, 1200);
 
 
-    expect(in_array($status, [200, 403, 422], true), "Unexpected status for user3 upload without certificate.\n{$debug}")->toBeTrue();
+    expect(in_array($status, [200, 403, 422], true), "Unexpected status for uncertified account qualified upload.\n{$debug}")->toBeTrue();
     if ($status === 200) {
         expect(is_array($json), "Expected JSON response.\n{$debug}")->toBeTrue();
         expect((string)($json['data']['uuid'] ?? ''), "Expected data.uuid on success.\n{$debug}")->not->toBe('');

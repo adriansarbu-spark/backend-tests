@@ -18,7 +18,7 @@ beforeAll(function () {
 });
 
 /**
- * (moved) Shared setup now lives in SigningFlowHelper::sentDocFromUser1ToUser2().
+ * Shared fixture: SigningFlowHelper::sentDocFromUser1ToUser2() (test user 1 = sender, test user 2 = receiver).
  */
 
 test('signing flow: owner creates and signs document', function () {
@@ -77,7 +77,7 @@ test('signing flow: other user cannot sign with owner sign_code', function () {
     }
 });
 
-test('signing flow: user1 sends to user2 and user2 can sign', function () {
+test('signing flow: sender sends to receiver and receiver can sign', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 
@@ -123,15 +123,15 @@ test('signing flow: user1 sends to user2 and user2 can sign', function () {
         : 'null';
     $signDebug = "Status={$signStatus}\nJSON:\n{$signJsonText}\nRAW:\n{$signRaw}";
 
-    expect($signStatus, "User2 sign failed with full details:\n{$signDebug}")->toBe(200);
-    expect(is_array($signJson), "User2 sign returned non-JSON. Full details:\n{$signDebug}")->toBeTrue();
+    expect($signStatus, "Receiver sign failed with full details:\n{$signDebug}")->toBe(200);
+    expect(is_array($signJson), "Receiver sign returned non-JSON. Full details:\n{$signDebug}")->toBeTrue();
     expect(
         (string)($signJson['data']['sign_code'] ?? ''),
-        "User2 sign response missing expected sign_code. Full details:\n{$signDebug}"
+        "Receiver sign response missing expected sign_code. Full details:\n{$signDebug}"
     )->toBe($user2SignCode);
 });
 
-test('signing flow: user2 signs and both user1 and user2 can view the document', function () {
+test('signing flow: receiver signs and sender and receiver can view the document', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 
@@ -171,25 +171,25 @@ test('signing flow: user2 signs and both user1 and user2 can view the document',
         TEST_USER_2_TOTP_SECRET
     );
     $signDebug = 'status=' . $signStatus . ' raw=' . substr($signRaw, 0, 700);
-    expect($signStatus, "User2 sign failed. {$signDebug}")->toBe(200);
+    expect($signStatus, "Receiver sign failed. {$signDebug}")->toBe(200);
 
-    // User1 (owner) can view by UUID
+    // Sender (owner) can view by UUID
     [$u1Status, $u1Json, $u1Raw] = ApiAuthHelper::apiRequest(
         'GET',
         API_URL . 'documents/' . rawurlencode($uuid),
         $user1Bearer
     );
-    expect($u1Status, 'User1 should be able to view document by UUID. ' . substr($u1Raw, 0, 700))->toBe(200);
+    expect($u1Status, 'Sender should be able to view document by UUID. ' . substr($u1Raw, 0, 700))->toBe(200);
     expect(is_array($u1Json))->toBeTrue();
     expect((string)($u1Json['data']['uuid'] ?? ''))->toBe($uuid);
 
-    // User2 can view via signer file endpoint (UUID endpoints are owner-only)
+    // Receiver can view via signer file endpoint (UUID endpoints are owner-only)
     [$u2Status, , $u2Raw] = SigningFlowHelper::getSignerFile($user2Bearer, $user2SignCode);
-    expect($u2Status, 'User2 should be able to download signer PDF. ' . substr($u2Raw, 0, 120))->toBe(200);
+    expect($u2Status, 'Receiver should be able to download signer PDF. ' . substr($u2Raw, 0, 120))->toBe(200);
     expect(str_starts_with((string)$u2Raw, '%PDF'), 'Expected signer file response to be a PDF')->toBeTrue();
 });
 
-test('signing flow: user1 and user2 sign', function () {
+test('signing flow: sender and receiver both sign in signing order', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 
@@ -226,15 +226,15 @@ test('signing flow: user1 and user2 sign', function () {
 
     SigningFlowHelper::sendDocument($user1Bearer, $uuid);
 
-    // User1 signs first (order 1)
+    // Sender signs first (order 1)
     $user1SignCode = SigningFlowHelper::getSignCodeForEmail($user1Bearer, $uuid, TEST_USER_1_EMAIL);
     [$u1SignStatus, , $u1SignRaw] = SigningFlowHelper::sign($user1Bearer, $user1SignCode, TEST_USER_1_TOTP_SECRET);
-    expect($u1SignStatus, 'User1 sign failed: ' . substr($u1SignRaw, 0, 700))->toBe(200);
+    expect($u1SignStatus, 'Sender sign failed: ' . substr($u1SignRaw, 0, 700))->toBe(200);
 
-    // After user1 signs, user2 should get invited and see a sign_code in their list
+    // After sender signs, receiver should get invited and see a sign_code in their list
     $user2SignCode = SigningFlowHelper::waitForSignCodeForDocumentName($user2Bearer, $documentName);
     [$u2SignStatus, , $u2SignRaw] = SigningFlowHelper::sign($user2Bearer, $user2SignCode, TEST_USER_2_TOTP_SECRET);
-    expect($u2SignStatus, 'User2 sign failed: ' . substr($u2SignRaw, 0, 700))->toBe(200);
+    expect($u2SignStatus, 'Receiver sign failed: ' . substr($u2SignRaw, 0, 700))->toBe(200);
 
     // Owner can still view the document at the end
     [$finalStatus, $finalJson, $finalRaw] = ApiAuthHelper::apiRequest(
@@ -247,7 +247,7 @@ test('signing flow: user1 and user2 sign', function () {
     expect((string)($finalJson['data']['uuid'] ?? ''))->toBe($uuid);
 });
 
-test('signing flow: user1 requests signature from user3 without certificate and user3 cannot sign (expected)', function () {
+test('signing flow: sender invites uncertified invitee who cannot sign (expected)', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user3Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_3_EMAIL, TEST_USER_3_PASSWORD);
 
@@ -292,12 +292,12 @@ test('signing flow: user1 requests signature from user3 without certificate and 
         : 'null';
     $debug = "Status={$signStatus}\nJSON:\n{$signJsonText}\nRAW:\n" . substr((string)$signRaw, 0, 1200);
 
-    expect($signStatus, "User3 should NOT be able to sign (no certificate). If this fails, behavior changed.\n{$debug}")
+    expect($signStatus, "Uncertified invitee should NOT be able to sign. If this fails, behavior changed.\n{$debug}")
         ->not
         ->toBe(200);
 });
 
-test('signing flow: user2 can reject and both user1 and user2 can view the document', function () {
+test('signing flow: receiver can reject and sender and receiver can view the document', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 
@@ -340,25 +340,25 @@ test('signing flow: user2 can reject and both user1 and user2 can view the docum
         ? (string)json_encode($rejectJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
         : 'null';
     $rejectDebug = "Status={$rejectStatus}\nJSON:\n{$rejectJsonText}\nRAW:\n{$rejectRaw}";
-    expect($rejectStatus, "User2 reject failed.\n{$rejectDebug}")->toBe(200);
+    expect($rejectStatus, "Receiver reject failed.\n{$rejectDebug}")->toBe(200);
 
-    // User1 can view by UUID
+    // Sender can view by UUID
     [$u1Status, $u1Json, $u1Raw] = ApiAuthHelper::apiRequest(
         'GET',
         API_URL . 'documents/' . rawurlencode($uuid),
         $user1Bearer
     );
-    expect($u1Status, 'User1 should be able to view document after rejection. ' . substr($u1Raw, 0, 700))->toBe(200);
+    expect($u1Status, 'Sender should be able to view document after rejection. ' . substr($u1Raw, 0, 700))->toBe(200);
     expect(is_array($u1Json))->toBeTrue();
     expect((string)($u1Json['data']['uuid'] ?? ''))->toBe($uuid);
 
-    // User2 can still view the file via sign_code (should generally remain accessible)
+    // Receiver can still view the file via sign_code (should generally remain accessible)
     [$u2FileStatus, , $u2FileRaw] = SigningFlowHelper::getSignerFile($user2Bearer, $user2SignCode);
-    expect($u2FileStatus, 'User2 should be able to download signer PDF after rejection. ' . substr((string)$u2FileRaw, 0, 120))->toBe(200);
+    expect($u2FileStatus, 'Receiver should be able to download signer PDF after rejection. ' . substr((string)$u2FileRaw, 0, 120))->toBe(200);
     expect(str_starts_with((string)$u2FileRaw, '%PDF'), 'Expected signer file response to be a PDF')->toBeTrue();
 });
 
-test('signing flow: user2 rejects and then cannot sign', function () {
+test('signing flow: receiver rejects and then cannot sign', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 
@@ -398,7 +398,7 @@ test('signing flow: user2 rejects and then cannot sign', function () {
         TEST_USER_2_TOTP_SECRET
     );
     $rejectDebug = 'status=' . $rejectStatus . ' raw=' . substr((string)$rejectRaw, 0, 700);
-    expect($rejectStatus, "User2 reject failed. {$rejectDebug}")->toBe(200);
+    expect($rejectStatus, "Receiver reject failed. {$rejectDebug}")->toBe(200);
 
     [$signStatus, $signJson, $signRaw] = SigningFlowHelper::signWithRetry(
         $user2Bearer,
@@ -410,10 +410,10 @@ test('signing flow: user2 rejects and then cannot sign', function () {
         : 'null';
     $signDebug = "Status={$signStatus}\nJSON:\n{$signJsonText}\nRAW:\n" . substr((string)$signRaw, 0, 1200);
 
-    expect($signStatus, "User2 should not be able to sign after rejection.\n{$signDebug}")->not->toBe(200);
+    expect($signStatus, "Receiver should not be able to sign after rejection.\n{$signDebug}")->not->toBe(200);
 });
 
-test('signing flow: user1 cancels and both user1 and user2 can view the document', function () {
+test('signing flow: sender cancels and sender and receiver can view the document', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 
@@ -456,26 +456,26 @@ test('signing flow: user1 cancels and both user1 and user2 can view the document
         ? (string)json_encode($cancelJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
         : 'null';
     $cancelDebug = "Status={$cancelStatus}\nJSON:\n{$cancelJsonText}\nRAW:\n{$cancelRaw}";
-    expect($cancelStatus, "User1 cancel failed.\n{$cancelDebug}")->toBe(200);
+    expect($cancelStatus, "Sender cancel failed.\n{$cancelDebug}")->toBe(200);
 
-    // User1 can view by UUID
+    // Sender can view by UUID
     [$u1Status, $u1Json, $u1Raw] = ApiAuthHelper::apiRequest(
         'GET',
         API_URL . 'documents/' . rawurlencode($uuid),
         $user1Bearer
     );
-    expect($u1Status, 'User1 should be able to view document after cancel. ' . substr($u1Raw, 0, 700))->toBe(200);
+    expect($u1Status, 'Sender should be able to view document after cancel. ' . substr($u1Raw, 0, 700))->toBe(200);
     expect(is_array($u1Json))->toBeTrue();
     expect((string)($u1Json['data']['uuid'] ?? ''))->toBe($uuid);
 
-    // User2 view after cancel (behavior may vary: some envs block signer access after cancel)
+    // Receiver view after cancel (behavior may vary: some envs block signer access after cancel)
     [$u2FileStatus, $u2FileJson, $u2FileRaw] = SigningFlowHelper::getSignerFile($user2Bearer, $user2SignCode);
     $u2FileJsonText = is_array($u2FileJson)
         ? (string)json_encode($u2FileJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
         : 'null';
     $u2FileDebug = "Status={$u2FileStatus}\nJSON:\n{$u2FileJsonText}\nRAW:\n" . substr((string)$u2FileRaw, 0, 700);
 
-    expect(in_array($u2FileStatus, [200, 403, 404, 422], true), "Unexpected status for user2 signer file after cancel.\n{$u2FileDebug}")
+    expect(in_array($u2FileStatus, [200, 403, 404, 422], true), "Unexpected status for receiver signer file after cancel.\n{$u2FileDebug}")
         ->toBeTrue();
     if ($u2FileStatus === 200) {
         expect(str_starts_with((string)$u2FileRaw, '%PDF'), "Expected signer file response to be a PDF.\n{$u2FileDebug}")->toBeTrue();
@@ -485,7 +485,7 @@ test('signing flow: user1 cancels and both user1 and user2 can view the document
     }
 });
 
-test('signing flow: user1 cancels and user2 cannot sign', function () {
+test('signing flow: sender cancels and receiver cannot sign', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 
@@ -525,7 +525,7 @@ test('signing flow: user1 cancels and user2 cannot sign', function () {
         TEST_USER_1_TOTP_SECRET
     );
     $cancelDebug = 'status=' . $cancelStatus . ' raw=' . substr((string)$cancelRaw, 0, 700);
-    expect($cancelStatus, "User1 cancel failed. {$cancelDebug}")->toBe(200);
+    expect($cancelStatus, "Sender cancel failed. {$cancelDebug}")->toBe(200);
 
     [$signStatus, $signJson, $signRaw] = SigningFlowHelper::signWithRetry(
         $user2Bearer,
@@ -537,10 +537,10 @@ test('signing flow: user1 cancels and user2 cannot sign', function () {
         : 'null';
     $signDebug = "Status={$signStatus}\nJSON:\n{$signJsonText}\nRAW:\n" . substr((string)$signRaw, 0, 1200);
 
-    expect($signStatus, "User2 should not be able to sign after cancel.\n{$signDebug}")->not->toBe(200);
+    expect($signStatus, "Receiver should not be able to sign after cancel.\n{$signDebug}")->not->toBe(200);
 });
 
-test('signing sanity: user1 cannot reject user2 document', function () {
+test('signing sanity: sender cannot reject using receiver sign_code', function () {
     [$uuid, $documentName, $user2SignCode] = SigningFlowHelper::sentDocFromUser1ToUser2();
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
 
@@ -556,12 +556,12 @@ test('signing sanity: user1 cannot reject user2 document', function () {
     $debug = "uuid={$uuid} name={$documentName}\nStatus={$rejectStatus}\nJSON:\n{$rejectJsonText}\nRAW:\n" . substr((string)$rejectRaw, 0, 1200);
 
     if ($rejectStatus === 200) {
-        test()->markTestIncomplete("SECURITY CHECK FAILED: user1 was able to reject using user2 sign_code.\n{$debug}");
+        test()->markTestIncomplete("SECURITY CHECK FAILED: sender was able to reject using receiver sign_code.\n{$debug}");
     }
-    expect($rejectStatus, "User1 should not be able to reject using user2 sign_code.\n{$debug}")->not->toBe(200);
+    expect($rejectStatus, "Sender should not be able to reject using receiver sign_code.\n{$debug}")->not->toBe(200);
 });
 
-test('signing sanity: user2 cannot cancel user1 document', function () {
+test('signing sanity: receiver cannot cancel sender document', function () {
     [$uuid, $documentName, $user2SignCode] = SigningFlowHelper::sentDocFromUser1ToUser2();
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 
@@ -576,16 +576,16 @@ test('signing sanity: user2 cannot cancel user1 document', function () {
         : 'null';
     $debug = "uuid={$uuid} name={$documentName} sign_code={$user2SignCode}\nStatus={$cancelStatus}\nJSON:\n{$cancelJsonText}\nRAW:\n" . substr((string)$cancelRaw, 0, 1200);
 
-    expect($cancelStatus, "User2 should not be able to cancel owner document.\n{$debug}")->not->toBe(200);
+    expect($cancelStatus, "Receiver should not be able to cancel sender document.\n{$debug}")->not->toBe(200);
 });
 
-test('signing sanity: user1 cannot reject after user2 signed', function () {
+test('signing sanity: sender cannot reject after receiver signed', function () {
     [$uuid, $documentName, $user2SignCode] = SigningFlowHelper::sentDocFromUser1ToUser2();
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 
     [$signStatus, , $signRaw] = SigningFlowHelper::signWithRetry($user2Bearer, $user2SignCode, TEST_USER_2_TOTP_SECRET);
-    expect($signStatus, 'Precondition failed: user2 should sign. raw=' . substr((string)$signRaw, 0, 700))->toBe(200);
+    expect($signStatus, 'Precondition failed: receiver should sign. raw=' . substr((string)$signRaw, 0, 700))->toBe(200);
 
     [$rejectStatus, $rejectJson, $rejectRaw] = SigningFlowHelper::reject(
         $user1Bearer,
@@ -598,15 +598,15 @@ test('signing sanity: user1 cannot reject after user2 signed', function () {
         : 'null';
     $debug = "uuid={$uuid} name={$documentName}\nStatus={$rejectStatus}\nJSON:\n{$rejectJsonText}\nRAW:\n" . substr((string)$rejectRaw, 0, 1200);
 
-    expect($rejectStatus, "User1 should not be able to reject after user2 signed.\n{$debug}")->not->toBe(200);
+    expect($rejectStatus, "Sender should not be able to reject after receiver signed.\n{$debug}")->not->toBe(200);
 });
 
-test('signing sanity: user2 cannot cancel after user2 signed', function () {
+test('signing sanity: receiver cannot cancel after receiver signed', function () {
     [$uuid, $documentName, $user2SignCode] = SigningFlowHelper::sentDocFromUser1ToUser2();
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 
     [$signStatus, , $signRaw] = SigningFlowHelper::signWithRetry($user2Bearer, $user2SignCode, TEST_USER_2_TOTP_SECRET);
-    expect($signStatus, 'Precondition failed: user2 should sign. raw=' . substr((string)$signRaw, 0, 700))->toBe(200);
+    expect($signStatus, 'Precondition failed: receiver should sign. raw=' . substr((string)$signRaw, 0, 700))->toBe(200);
 
     [$cancelStatus, $cancelJson, $cancelRaw] = SigningFlowHelper::cancelDocument(
         $user2Bearer,
@@ -619,6 +619,6 @@ test('signing sanity: user2 cannot cancel after user2 signed', function () {
         : 'null';
     $debug = "uuid={$uuid} name={$documentName} sign_code={$user2SignCode}\nStatus={$cancelStatus}\nJSON:\n{$cancelJsonText}\nRAW:\n" . substr((string)$cancelRaw, 0, 1200);
 
-    expect($cancelStatus, "User2 should not be able to cancel after signing.\n{$debug}")->not->toBe(200);
+    expect($cancelStatus, "Receiver should not be able to cancel after signing.\n{$debug}")->not->toBe(200);
 });
 
