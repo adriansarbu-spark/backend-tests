@@ -97,11 +97,11 @@ final class TemplatesApiHelper
             : 'null';
         $debug = "Status={$status}\nJSON:\n{$jsonText}\nRAW:\n" . substr((string)$raw, 0, 1200);
 
-        expect($status, "Create template failed.\n{$debug}")->toBe(200);
-        expect(is_array($json), "Create template did not return JSON.\n{$debug}")->toBeTrue();
+        expect($status)->toBe(200, "Create template failed.\n{$debug}");
+        expect(is_array($json))->toBeTrue("Create template did not return JSON.\n{$debug}");
 
         $uuid = (string)($json['data']['uuid'] ?? '');
-        expect($uuid, "Create template response missing data.uuid.\n{$debug}")->not->toBe('');
+        expect($uuid)->not->toBe('', "Create template response missing data.uuid.\n{$debug}");
 
         return [$apiBase, $uuid];
     }
@@ -145,8 +145,8 @@ final class TemplatesApiHelper
             : 'null';
         $debug = "Status={$status}\nJSON:\n{$jsonText}\nRAW:\n" . substr((string)$raw, 0, 1200);
 
-        expect($status, "Update template failed.\n{$debug}")->toBe(200);
-        expect(is_array($json), "Update template did not return JSON.\n{$debug}")->toBeTrue();
+        expect($status)->toBe(200, "Update template failed.\n{$debug}");
+        expect(is_array($json))->toBeTrue("Update template did not return JSON.\n{$debug}");
 
         return [$status, $json, $raw];
     }

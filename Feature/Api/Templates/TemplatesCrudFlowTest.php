@@ -7,6 +7,13 @@ require_once __DIR__ . '/../../../Support/ApiAuthHelper.php';
 require_once __DIR__ . '/../../../Support/TemplatesApiHelper.php';
 
 if (SKIP_INTEGRATION_TESTS) {
+    /**
+     * Prerequisites:
+     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php`.
+     *
+     * Steps:
+     * 1. Mark skipped; templates CRUD scenarios do not run.
+     */
     test('Skipping templates CRUD integration flow', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
@@ -18,15 +25,15 @@ beforeAll(function () {
 });
 
 /**
- * Main CRUD flows for user templates:
- * - create + list
- * - read/update/delete for owner vs non-owner
+ * Prerequisites:
+ * - Integration tests enabled; `TemplatesApiHelper::assertRequiredConfigOrSkip()` in `beforeAll`.
+ * - Bearer for `TEST_USER_1_*`; templates API base from `TemplatesApiHelper::apiBase()`.
  *
- * These tests follow the patterns from DocumentsFlowTest and SigningFlowTest:
- * use helpers for auth, focus on status codes and response shape, and avoid
- * asserting on human-readable error messages.
+ * Steps:
+ * 1. `TemplatesApiHelper::rawCreateTemplate` with name, content, category, visibility private.
+ * 2. Assert 200 and `data.uuid`.
+ * 3. GET `/templates` list; find row by uuid; assert name, category, visibility, status, version and count fields.
  */
-
 test('templates flow: owner can create template and see it in list', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $apiBase = TemplatesApiHelper::apiBase();
@@ -49,10 +56,10 @@ test('templates flow: owner can create template and see it in list', function ()
         : 'null';
     $createDebug = "Status={$createStatus}\nJSON:\n{$createJsonText}\nRAW:\n" . substr((string)$createRaw, 0, 1200);
 
-    expect($createStatus, "Create template failed.\n{$createDebug}")->toBe(200);
-    expect(is_array($createJson), "Expected JSON create response.\n{$createDebug}")->toBeTrue();
+    expect($createStatus)->toBe(200, "Create template failed.\n{$createDebug}");
+    expect(is_array($createJson))->toBeTrue("Expected JSON create response.\n{$createDebug}");
     $uuid = (string)($createJson['data']['uuid'] ?? '');
-    expect($uuid, "Expected data.uuid in create response.\n{$createDebug}")->not->toBe('');
+    expect($uuid)->not->toBe('', "Expected data.uuid in create response.\n{$createDebug}");
 
     [$listStatus, $listJson, $listRaw] = ApiAuthHelper::apiRequest(
         'GET',
@@ -65,8 +72,8 @@ test('templates flow: owner can create template and see it in list', function ()
         : 'null';
     $listDebug = "Status={$listStatus}\nJSON:\n{$listJsonText}\nRAW:\n" . substr((string)$listRaw, 0, 1200);
 
-    expect($listStatus, "List templates failed.\n{$listDebug}")->toBe(200);
-    expect(is_array($listJson), "Expected JSON list response.\n{$listDebug}")->toBeTrue();
+    expect($listStatus)->toBe(200, "List templates failed.\n{$listDebug}");
+    expect(is_array($listJson))->toBeTrue("Expected JSON list response.\n{$listDebug}");
 
     $items = (array)($listJson['data'] ?? []);
     $found = null;
@@ -80,7 +87,7 @@ test('templates flow: owner can create template and see it in list', function ()
         }
     }
 
-    expect($found, "Created template uuid={$uuid} not found in list.\n{$listDebug}")->not->toBeNull();
+    expect($found)->not->toBeNull("Created template uuid={$uuid} not found in list.\n{$listDebug}");
     expect($found['name'] ?? null)->toBe($templateName);
     expect($found['category_code'] ?? null)->toBe('contracts');
     expect($found['visibility'] ?? null)->toBe('private');
@@ -90,6 +97,16 @@ test('templates flow: owner can create template and see it in list', function ()
     expect(is_int($found['smartfields_count'] ?? null))->toBeTrue();
 });
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; valid owner bearer.
+ *
+ * Steps:
+ * 1. Create without `name` → 422; assert structured or non-empty `error`.
+ * 2. Create without `content` → 422; field `content` when structured.
+ * 3. Invalid `category_code` → 422; field `category_code` when structured.
+ * 4. Non-array `parties` / `smartfields` → 422 with matching `field` when structured.
+ */
 test('templates flow: create validation errors return 422 with code/field', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $apiBase = TemplatesApiHelper::apiBase();
@@ -188,6 +205,16 @@ test('templates flow: create validation errors return 422 with code/field', func
     }
 });
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; `TemplatesApiHelper::createTemplateForFlow` succeeds for user 1.
+ *
+ * Steps:
+ * 1. GET own draft by uuid; assert `parties`/`smartfields` keys in `data`.
+ * 2. PUT update content and visibility via `updateTemplateForFlow`.
+ * 3. GET again to confirm uuid still matches.
+ * 4. DELETE; assert `data.deleted`; GET returns 404.
+ */
 test('templates flow: owner can get, update and delete own draft template', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
 
@@ -211,8 +238,8 @@ test('templates flow: owner can get, update and delete own draft template', func
         : 'null';
     $getDebug = "Status={$getStatus}\nJSON:\n{$getJsonText}\nRAW:\n" . substr((string)$getRaw, 0, 1200);
 
-    expect($getStatus, "Owner GET failed.\n{$getDebug}")->toBe(200);
-    expect(is_array($getJson), "Expected JSON GET response.\n{$getDebug}")->toBeTrue();
+    expect($getStatus)->toBe(200, "Owner GET failed.\n{$getDebug}");
+    expect(is_array($getJson))->toBeTrue("Expected JSON GET response.\n{$getDebug}");
     expect((string)($getJson['data']['uuid'] ?? ''))->toBe($uuid);
     expect(isset($getJson['data']['parties']))->toBeTrue();
     expect(isset($getJson['data']['smartfields']))->toBeTrue();
@@ -249,8 +276,8 @@ test('templates flow: owner can get, update and delete own draft template', func
         : 'null';
     $deleteDebug = "Status={$deleteStatus}\nJSON:\n{$deleteJsonText}\nRAW:\n" . substr((string)$deleteRaw, 0, 1200);
 
-    expect($deleteStatus, "Owner DELETE failed.\n{$deleteDebug}")->toBe(200);
-    expect(is_array($deleteJson), "Expected JSON DELETE response.\n{$deleteDebug}")->toBeTrue();
+    expect($deleteStatus)->toBe(200, "Owner DELETE failed.\n{$deleteDebug}");
+    expect(is_array($deleteJson))->toBeTrue("Expected JSON DELETE response.\n{$deleteDebug}");
     expect((bool)($deleteJson['data']['deleted'] ?? false))->toBeTrue();
 
     // After delete, GET should return 404
@@ -262,6 +289,16 @@ test('templates flow: owner can get, update and delete own draft template', func
     expect($getAfterDeleteStatus)->toBe(404);
 });
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; `TEST_USER_1_*` and `TEST_USER_2_*` both configured.
+ *
+ * Steps:
+ * 1. User 1 creates a private template; capture uuid.
+ * 2. User 2 GET same uuid → 403 and non-empty `error` if JSON.
+ * 3. User 2 PUT via `rawUpdateTemplate` → 403 and non-empty errors.
+ * 4. User 2 DELETE → 403 and non-empty errors (owner’s template must still exist).
+ */
 test('templates flow: non-owner receives 403 for GET/PUT/DELETE on private template', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);

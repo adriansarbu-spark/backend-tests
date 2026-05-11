@@ -111,10 +111,10 @@ final class SigningFlowHelper
             ],
         ]);
 
-        expect($status, 'Create document failed: ' . substr($raw, 0, 700))->toBe(200);
-        expect(is_array($json), 'Create document returned non-JSON: ' . substr($raw, 0, 700))->toBeTrue();
+        expect($status)->toBe(200, 'Create document failed: ' . substr($raw, 0, 700));
+        expect(is_array($json))->toBeTrue('Create document returned non-JSON: ' . substr($raw, 0, 700));
         $uuid = (string)($json['data']['uuid'] ?? '');
-        expect($uuid, 'Create document missing data.uuid: ' . substr($raw, 0, 700))->not->toBe('');
+        expect($uuid)->not->toBe('', 'Create document missing data.uuid: ' . substr($raw, 0, 700));
         return $uuid;
     }
 
@@ -133,8 +133,8 @@ final class SigningFlowHelper
             ['form_params' => ['annotations' => json_encode($annotations)]]
         );
 
-        expect($status, 'Set annotations failed: ' . substr($raw, 0, 700))->toBe(200);
-        expect(is_array($json), 'Set annotations returned non-JSON: ' . substr($raw, 0, 700))->toBeTrue();
+        expect($status)->toBe(200, 'Set annotations failed: ' . substr($raw, 0, 700));
+        expect(is_array($json))->toBeTrue('Set annotations returned non-JSON: ' . substr($raw, 0, 700));
     }
 
     /**
@@ -151,8 +151,8 @@ final class SigningFlowHelper
             ['form_params' => ['signers' => json_encode($signers)]]
         );
 
-        expect($status, 'Set signers failed: ' . substr($raw, 0, 700))->toBe(200);
-        expect(is_array($json), 'Set signers returned non-JSON: ' . substr($raw, 0, 700))->toBeTrue();
+        expect($status)->toBe(200, 'Set signers failed: ' . substr($raw, 0, 700));
+        expect(is_array($json))->toBeTrue('Set signers returned non-JSON: ' . substr($raw, 0, 700));
     }
 
     /**
@@ -170,8 +170,8 @@ final class SigningFlowHelper
             $bearer
         );
 
-        expect($status, 'Get document failed: ' . substr($raw, 0, 700))->toBe(200);
-        expect(is_array($json), 'Get document returned non-JSON: ' . substr($raw, 0, 700))->toBeTrue();
+        expect($status)->toBe(200, 'Get document failed: ' . substr($raw, 0, 700));
+        expect(is_array($json))->toBeTrue('Get document returned non-JSON: ' . substr($raw, 0, 700));
 
         foreach ((array)($json['data']['signers'] ?? []) as $signer) {
             if (strtolower(trim((string)($signer['email'] ?? ''))) === strtolower(trim($email))) {
@@ -213,7 +213,7 @@ final class SigningFlowHelper
             );
         }
 
-        expect(is_array($json), 'Send document returned non-JSON: ' . substr($raw, 0, 700))->toBeTrue();
+        expect(is_array($json))->toBeTrue('Send document returned non-JSON: ' . substr($raw, 0, 700));
     }
 
     /**
@@ -230,8 +230,8 @@ final class SigningFlowHelper
             $bearer
         );
 
-        expect($status, 'List documents failed: ' . substr($raw, 0, 700))->toBe(200);
-        expect(is_array($json), 'List documents returned non-JSON: ' . substr($raw, 0, 700))->toBeTrue();
+        expect($status)->toBe(200, 'List documents failed: ' . substr($raw, 0, 700));
+        expect(is_array($json))->toBeTrue('List documents returned non-JSON: ' . substr($raw, 0, 700));
 
         foreach ((array)($json['data'] ?? []) as $doc) {
             if (trim((string)($doc['name'] ?? '')) === trim($documentName)) {

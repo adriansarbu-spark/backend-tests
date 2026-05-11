@@ -8,13 +8,23 @@ require_once __DIR__ . '/../../../Support/DocumentsFlowManager.php';
 require_once __DIR__ . '/../../../Support/DocumentsApiHelper.php';
 
 if (SKIP_INTEGRATION_TESTS) {
+    /**
+     * Prerequisites:
+     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php` (integration suite disabled for this run).
+     *
+     * Steps:
+     * 1. Mark skipped so no database or HTTP document flow runs.
+     */
     test('Skipping documents integration flow', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
     return;
 }
 
-
+/**
+ * Lazy singleton for `DocumentsFlowManager` so this file shares one initialized flow
+ * (bearers + one document UUID from `initialize()`) across tests that use `getDocumentsFlowManager()`.
+ */
 function getDocumentsFlowManager(): DocumentsFlowManager
 {
     static $manager = null;
@@ -28,11 +38,28 @@ function getDocumentsFlowManager(): DocumentsFlowManager
     return $manager;
 }
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled (`SKIP_INTEGRATION_TESTS` false).
+ * - `DocumentsFlowManager::forConfiguredTestUsers()` requirements met (e.g. `TEST_USER_1_*`, `TEST_USER_2_*`, `API_URL`).
+ *
+ * Steps:
+ * 1. Resolve the shared flow manager and run `initialize()` (creates a document as user1).
+ * 2. Assert the manager exposes a non-empty document UUID.
+ */
 test('documents flow: add document', function () {
     $manager = getDocumentsFlowManager();
     expect($manager->getUuid())->not->toBe('');
 });
 
+/**
+ * Prerequisites:
+ * - Shared flow initialized: document owned by user1; UUID and API base from the manager.
+ *
+ * Steps:
+ * 1. `GET /documents/{uuid}` with user1 bearer.
+ * 2. Assert 200, JSON body, and `data.uuid` equals the flow UUID.
+ */
 test('documents flow: get document as owner', function () {
     $manager = getDocumentsFlowManager();
     $apiBase = $manager->getApiBase();
@@ -45,6 +72,14 @@ test('documents flow: get document as owner', function () {
     expect((string)($ownerGetJson['data']['uuid'] ?? ''))->toBe($uuid);
 });
 
+/**
+ * Prerequisites:
+ * - Shared document owned by user1; user2 is a different account with a valid bearer.
+ *
+ * Steps:
+ * 1. `GET /documents/{uuid}` with user2 bearer.
+ * 2. Assert 403 (non-owner must not read the resource).
+ */
 test('documents flow: get document as non-owner is forbidden', function () {
     $manager = getDocumentsFlowManager();
     $apiBase = $manager->getApiBase();
@@ -55,6 +90,15 @@ test('documents flow: get document as non-owner is forbidden', function () {
     expect($otherGetStatus)->toBe(403);
 });
 
+/**
+ * Prerequisites:
+ * - User1 bearer valid; document create succeeds (helper may skip if upload directory is not writable).
+ *
+ * Steps:
+ * 1. Create a new document for user1 via `DocumentsApiHelper::createDocumentForFlow`.
+ * 2. `GET /documents/{uuid}/file` as owner.
+ * 3. Assert 200 and raw body starts with `%PDF`.
+ */
 test('documents flow: document owner can download their PDF via /file', function () {
     $manager = getDocumentsFlowManager();
     $user1Bearer = $manager->getUser1Bearer();
@@ -68,10 +112,19 @@ test('documents flow: document owner can download their PDF via /file', function
     );
 
     $fileDebug = substr((string)$fileRaw, 0, 500);
-    expect($fileStatus, 'Owner should be able to download /file. status=' . $fileStatus . ' raw=' . $fileDebug)->toBe(200);
-    expect(str_starts_with((string)$fileRaw, '%PDF'), 'Expected /file response to be a PDF. raw=' . $fileDebug)->toBeTrue();
+    expect($fileStatus)->toBe(200, 'Owner should be able to download /file. status=' . $fileStatus . ' raw=' . $fileDebug);
+    expect(str_starts_with((string)$fileRaw, '%PDF'))->toBeTrue('Expected /file response to be a PDF. raw=' . $fileDebug);
 });
 
+/**
+ * Prerequisites:
+ * - Two distinct test users with valid bearers (`DocumentsFlowManager` / `tests_config.php`).
+ *
+ * Steps:
+ * 1. Create a document owned by user2.
+ * 2. Request `GET /documents/{uuid}/file` with user1 bearer (non-owner).
+ * 3. Assert status is not 200; when JSON is returned, assert non-empty `error` (guideline: assert error shape on failures).
+ */
 test('documents flow: non-owner cannot download another account document via /file', function () {
     $manager = getDocumentsFlowManager();
     $user2Bearer = $manager->getUser2Bearer();
@@ -86,21 +139,38 @@ test('documents flow: non-owner cannot download another account document via /fi
     );
 
     $fileDebug = substr((string)$fileRaw, 0, 700);
-    expect($fileStatus, 'Non-owner must not be able to download peer document /file. status=' . $fileStatus . ' raw=' . $fileDebug)->not->toBe(200);
+    expect($fileStatus)->not->toBe(200, 'Non-owner must not be able to download peer document /file. status=' . $fileStatus . ' raw=' . $fileDebug);
     if (is_array($fileJson)) {
         $errorsJoined = implode(' | ', array_map('strval', (array)($fileJson['error'] ?? [])));
-        expect($errorsJoined, 'Expected an error message for forbidden file download. raw=' . $fileDebug)->not->toBe('');
+        expect($errorsJoined)->not->toBe('', 'Expected an error message for forbidden file download. raw=' . $fileDebug);
     }
 });
 
 
 if (defined('SKIP_USER_3_FAILED_TESTS') && SKIP_USER_3_FAILED_TESTS) {
+    /**
+     * Prerequisites:
+     * - `SKIP_USER_3_FAILED_TESTS` is true — user3 uncertified upload scenarios are disabled for this run.
+     *
+     * Steps:
+     * 1. Mark skipped; the full scenario runs when the flag is false.
+     */
     test('documents flow: uncertified account qualified upload (behavior check)', function () {
         $this->markTestSkipped('Uncertified-account upload tests are disabled');
     });
     return;
 }
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; `SKIP_USER_3_FAILED_TESTS` false.
+ * - `TEST_USER_3_EMAIL` / `TEST_USER_3_PASSWORD` available for `ApiAuthHelper::bearerTokenFor`.
+ *
+ * Steps:
+ * 1. Upload a minimal PDF as QUALIFIED via `DocumentsApiHelper::uploadDocumentForFlow` as user3 (uncertified account behavior).
+ * 2. Assert status is one of 200, 403, or 422 (environment/account-dependent).
+ * 3. On 200: assert JSON and non-empty `data.uuid`. On non-200 with JSON: assert non-empty `error`.
+ */
 test('documents flow: uncertified account qualified upload (behavior check)', function () {
     $user3Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_3_EMAIL, TEST_USER_3_PASSWORD);
 
@@ -122,12 +192,12 @@ test('documents flow: uncertified account qualified upload (behavior check)', fu
     $debug = "Status={$status}\nJSON:\n{$jsonText}\nRAW:\n" . substr((string)$raw, 0, 1200);
 
 
-    expect(in_array($status, [200, 403, 422], true), "Unexpected status for uncertified account qualified upload.\n{$debug}")->toBeTrue();
+    expect(in_array($status, [200, 403, 422], true))->toBeTrue("Unexpected status for uncertified account qualified upload.\n{$debug}");
     if ($status === 200) {
-        expect(is_array($json), "Expected JSON response.\n{$debug}")->toBeTrue();
-        expect((string)($json['data']['uuid'] ?? ''), "Expected data.uuid on success.\n{$debug}")->not->toBe('');
+        expect(is_array($json))->toBeTrue("Expected JSON response.\n{$debug}");
+        expect((string)($json['data']['uuid'] ?? ''))->not->toBe('', "Expected data.uuid on success.\n{$debug}");
     } else if (is_array($json)) {
         $errorsJoined = implode(' | ', array_map('strval', (array)($json['error'] ?? [])));
-        expect($errorsJoined, "Expected error message.\n{$debug}")->not->toBe('');
+        expect($errorsJoined)->not->toBe('', "Expected error message.\n{$debug}");
     }
 });

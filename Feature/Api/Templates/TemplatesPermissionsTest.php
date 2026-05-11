@@ -7,6 +7,13 @@ require_once __DIR__ . '/../../../Support/ApiAuthHelper.php';
 require_once __DIR__ . '/../../../Support/TemplatesApiHelper.php';
 
 if (SKIP_INTEGRATION_TESTS) {
+    /**
+     * Prerequisites:
+     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php`.
+     *
+     * Steps:
+     * 1. Mark skipped; templates permission scenarios do not run.
+     */
     test('Skipping templates permissions integration tests', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
@@ -18,10 +25,13 @@ beforeAll(function () {
 });
 
 /**
- * Authorization and tenancy for templates: non-owner GET/DELETE on private templates (getTemplate, deleteTemplate),
- * version routes, list isolation, unsupported HTTP methods. Follows documents-testing-guidelines.md (403 + non-empty errors).
+ * Prerequisites:
+ * - Integration tests enabled; two distinct test users (`TEST_USER_1_*`, `TEST_USER_2_*`).
+ *
+ * Steps:
+ * 1. User 1 creates private template.
+ * 2. User 2 GET `/templates/{uuid}` → 403; assert non-empty `error` when JSON.
  */
-
 test('templates permissions: non-owner denied on GET single private template', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
@@ -43,6 +53,14 @@ test('templates permissions: non-owner denied on GET single private template', f
     }
 });
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; two users; `createTemplateForFlow` for user 1.
+ *
+ * Steps:
+ * 1. User 2 DELETE `/templates/{uuid}` on user 1’s private template.
+ * 2. Assert 403 and non-empty `error` when JSON (resource must not be deleted by user 2).
+ */
 test('templates permissions: non-owner denied on DELETE single private template', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
@@ -64,6 +82,14 @@ test('templates permissions: non-owner denied on DELETE single private template'
     }
 });
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; private template owned by user 1.
+ *
+ * Steps:
+ * 1. User 2 GET `/templates/{uuid}/versions` → 403; non-empty `error`.
+ * 2. User 2 POST new version with JSON body → 403; non-empty `error`.
+ */
 test('templates permissions: non-owner denied on versions list and create version (private template)', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
@@ -99,6 +125,14 @@ test('templates permissions: non-owner denied on versions list and create versio
     }
 });
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; user 1 private draft template.
+ *
+ * Steps:
+ * 1. User 2 POST publish on user 1 template → 403; non-empty `error`.
+ * 2. User 2 POST clone → 403; non-empty `error`.
+ */
 test('templates permissions: non-owner denied on publish and clone (private template)', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
@@ -129,6 +163,14 @@ test('templates permissions: non-owner denied on publish and clone (private temp
     }
 });
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; both users configured.
+ *
+ * Steps:
+ * 1. User 1 creates uniquely named private template; record `uuid`.
+ * 2. User 2 GET `/templates` list; assert no item has that `uuid` (tenant isolation).
+ */
 test('templates permissions: other user list does not contain foreign private template uuid', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
@@ -148,8 +190,7 @@ test('templates permissions: other user list does not contain foreign private te
         $apiBase . '?page=1&per_page=100&sort=date_added&order=DESC',
         $user2Bearer
     );
-    $debug = "Status={$listSt}\n" . substr((string)$listRaw, 0, 1200);
-    expect($listSt, "List as user2 failed unexpectedly.\n{$debug}")->toBe(200);
+    expect($listSt)->toBe(200, "List as user2 failed unexpectedly.\nStatus={$listSt}\n" . substr((string)$listRaw, 0, 1200));
     expect(is_array($listJson))->toBeTrue();
 
     foreach ((array)($listJson['data'] ?? []) as $item) {
@@ -159,6 +200,14 @@ test('templates permissions: other user list does not contain foreign private te
     }
 });
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; valid bearer for `TEST_USER_1_*`.
+ *
+ * Steps:
+ * 1. PATCH templates collection URL.
+ * 2. Assert 405; JSON `error` non-empty or raw body non-empty.
+ */
 test('templates permissions: unsupported PATCH on collection returns 405', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $apiBase = TemplatesApiHelper::apiBase();

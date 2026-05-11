@@ -7,6 +7,13 @@ require_once __DIR__ . '/../../../Support/ApiAuthHelper.php';
 require_once __DIR__ . '/../../../Support/TemplatesApiHelper.php';
 
 if (SKIP_INTEGRATION_TESTS) {
+    /**
+     * Prerequisites:
+     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php`.
+     *
+     * Steps:
+     * 1. Mark skipped so the file still lists a placeholder when integration is off.
+     */
     test('Skipping library management integration flow', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
@@ -18,10 +25,18 @@ beforeAll(function () {
 });
 
 /**
- * @simplifi.ro write lifecycle (strategy §3.3): create draft, read, update, publish, archive, delete.
- * Requires POST/PUT on publicapi/v1/esign/tpl/library for the test user.
+ * Prerequisites:
+ * - Integration tests enabled; `TemplatesApiHelper::assertRequiredConfigOrSkip()` passed in `beforeAll`.
+ * - Bearer for `TEST_USER_1_*` with permission to POST/PUT/PUBLISH/ARCHIVE/DELETE on library (otherwise 403 skip on create).
+ *
+ * Steps:
+ * 1. POST create library draft with name, language, content, category; assert 200 and `data.uuid`.
+ * 2. GET library by uuid; assert name and `status` draft.
+ * 3. PUT update `content`; assert 200.
+ * 4. POST publish; assert `data.status` published.
+ * 5. POST archive; assert `data.archived` true.
+ * 6. DELETE; assert `data.deleted` true; GET same uuid returns 404.
  */
-
 test('library management: create draft, GET, PUT update, publish, archive, delete', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
@@ -46,18 +61,17 @@ test('library management: create draft, GET, PUT update, publish, archive, delet
     if ($cSt === 403) {
         test()->markTestSkipped('Library POST not allowed for test user (403).');
     }
-    expect($cSt, "Create library failed.\n{$cDebug}")->toBe(200);
+    expect($cSt)->toBe(200, "Create library failed.\n{$cDebug}");
     expect(is_array($cJson))->toBeTrue();
     $uuid = (string)($cJson['data']['uuid'] ?? '');
-    expect($uuid, "Missing data.uuid.\n{$cDebug}")->not->toBe('');
+    expect($uuid)->not->toBe('', "Missing data.uuid.\n{$cDebug}");
 
     [$gSt, $gJson, $gRaw] = ApiAuthHelper::apiRequest(
         'GET',
         $libraryBase . '/' . rawurlencode($uuid),
         $bearer
     );
-    $gDebug = "Status={$gSt}\n" . substr((string)$gRaw, 0, 1200);
-    expect($gSt, "GET library failed.\n{$gDebug}")->toBe(200);
+    expect($gSt)->toBe(200, "GET library failed.\nStatus={$gSt}\n" . substr((string)$gRaw, 0, 1200));
     expect((string)($gJson['data']['name'] ?? ''))->toBe($name);
     expect((string)($gJson['data']['status'] ?? ''))->toBe('draft');
 
@@ -71,16 +85,14 @@ test('library management: create draft, GET, PUT update, publish, archive, delet
             ],
         ]
     );
-    $uDebug = "Status={$uSt}\n" . substr((string)$uRaw, 0, 1200);
-    expect($uSt, "PUT library failed.\n{$uDebug}")->toBe(200);
+    expect($uSt)->toBe(200, "PUT library failed.\nStatus={$uSt}\n" . substr((string)$uRaw, 0, 1200));
 
     [$pSt, $pJson, $pRaw] = ApiAuthHelper::apiRequest(
         'POST',
         $libraryBase . '/' . rawurlencode($uuid) . '/publish',
         $bearer
     );
-    $pDebug = "Status={$pSt}\n" . substr((string)$pRaw, 0, 1200);
-    expect($pSt, "Publish library failed.\n{$pDebug}")->toBe(200);
+    expect($pSt)->toBe(200, "Publish library failed.\nStatus={$pSt}\n" . substr((string)$pRaw, 0, 1200));
     expect(is_array($pJson))->toBeTrue();
     expect((string)($pJson['data']['status'] ?? ''))->toBe('published');
 
@@ -89,8 +101,7 @@ test('library management: create draft, GET, PUT update, publish, archive, delet
         $libraryBase . '/' . rawurlencode($uuid) . '/archive',
         $bearer
     );
-    $aDebug = "Status={$aSt}\n" . substr((string)$aRaw, 0, 1200);
-    expect($aSt, "Archive library failed.\n{$aDebug}")->toBe(200);
+    expect($aSt)->toBe(200, "Archive library failed.\nStatus={$aSt}\n" . substr((string)$aRaw, 0, 1200));
     expect((bool)($aJson['data']['archived'] ?? false))->toBeTrue();
 
     [$dSt, $dJson, $dRaw] = ApiAuthHelper::apiRequest(
@@ -98,8 +109,7 @@ test('library management: create draft, GET, PUT update, publish, archive, delet
         $libraryBase . '/' . rawurlencode($uuid),
         $bearer
     );
-    $dDebug = "Status={$dSt}\n" . substr((string)$dRaw, 0, 1200);
-    expect($dSt, "DELETE library failed.\n{$dDebug}")->toBe(200);
+    expect($dSt)->toBe(200, "DELETE library failed.\nStatus={$dSt}\n" . substr((string)$dRaw, 0, 1200));
     expect(is_array($dJson))->toBeTrue();
     expect((bool)($dJson['data']['deleted'] ?? false))->toBeTrue();
 
@@ -111,6 +121,15 @@ test('library management: create draft, GET, PUT update, publish, archive, delet
     expect($goneSt)->toBe(404);
 });
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; library API config OK; bearer for `TEST_USER_1_*`.
+ * - POST library allowed for user (403 → skip).
+ *
+ * Steps:
+ * 1. POST create with `language_id` and `content` but omit `name`.
+ * 2. Assert 422; if structured `error`, assert `VALIDATION_ERROR` and `field` `name`; else assert non-empty error payload.
+ */
 test('library management: create validation missing name returns 422 with field', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
