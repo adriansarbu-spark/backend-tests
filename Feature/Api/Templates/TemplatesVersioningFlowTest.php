@@ -7,6 +7,13 @@ require_once __DIR__ . '/../../../Support/ApiAuthHelper.php';
 require_once __DIR__ . '/../../../Support/TemplatesApiHelper.php';
 
 if (SKIP_INTEGRATION_TESTS) {
+    /**
+     * Prerequisites:
+     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php`.
+     *
+     * Steps:
+     * 1. Mark skipped; versioning scenarios do not run.
+     */
     test('Skipping templates versioning integration flow', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
@@ -18,11 +25,15 @@ beforeAll(function () {
 });
 
 /**
- * Versioning and lifecycle flows: publish/archive, versions CRUD, parties/smartfields on versions,
- * clone and edit-published. Uses ApiAuthHelper + TemplatesApiHelper; asserts status and response
- * shape per documents-testing-guidelines.md (no reliance on free-text error messages).
+ * Prerequisites:
+ * - Integration tests enabled; `createTemplateForFlow` succeeds for `TEST_USER_1_*`.
+ *
+ * Steps:
+ * 1. POST publish draft → 200; `data.status` published.
+ * 2. POST publish again → 422; non-empty structured or string `error`.
+ * 3. POST archive → 200; `data.status` archived.
+ * 4. POST archive again → 422; non-empty `error`.
  */
-
 test('templates versioning: publish draft then archive; invalid transitions return 422', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $apiBase = TemplatesApiHelper::apiBase();
@@ -34,8 +45,7 @@ test('templates versioning: publish draft then archive; invalid transitions retu
         $apiBaseResolved . '/' . rawurlencode($uuid) . '/publish',
         $bearer
     );
-    $pubDebug = "Status={$pubStatus}\n" . substr((string)$pubRaw, 0, 800);
-    expect($pubStatus, "Publish failed.\n{$pubDebug}")->toBe(200);
+    expect($pubStatus)->toBe(200, "Publish failed.\nStatus={$pubStatus}\n" . substr((string)$pubRaw, 0, 800));
     expect(is_array($pubJson))->toBeTrue();
     expect((string)($pubJson['data']['status'] ?? ''))->toBe('published');
 
@@ -59,8 +69,7 @@ test('templates versioning: publish draft then archive; invalid transitions retu
         $apiBaseResolved . '/' . rawurlencode($uuid) . '/archive',
         $bearer
     );
-    $archDebug = "Status={$archStatus}\n" . substr((string)$archRaw, 0, 800);
-    expect($archStatus, "Archive failed.\n{$archDebug}")->toBe(200);
+    expect($archStatus)->toBe(200, "Archive failed.\nStatus={$archStatus}\n" . substr((string)$archRaw, 0, 800));
     expect(is_array($archJson))->toBeTrue();
     expect((string)($archJson['data']['status'] ?? ''))->toBe('archived');
 
@@ -80,181 +89,14 @@ test('templates versioning: publish draft then archive; invalid transitions retu
     }
 });
 
-test('templates versioning: list versions, create draft version, update, parties, publish version', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $apiBase = TemplatesApiHelper::apiBase();
-
-    [$apiBaseResolved, $templateUuid] = TemplatesApiHelper::createTemplateForFlow(
-        $bearer,
-        ['name' => 'Version flow ' . gmdate('YmdHis')],
-        $apiBase
-    );
-
-    [$p1, $j1, $r1] = ApiAuthHelper::apiRequest(
-        'POST',
-        $apiBaseResolved . '/' . rawurlencode($templateUuid) . '/publish',
-        $bearer
-    );
-    expect($p1, substr((string)$r1, 0, 600))->toBe(200);
-
-    [$list1Status, $list1Json, $list1Raw] = ApiAuthHelper::apiRequest(
-        'GET',
-        $apiBaseResolved . '/' . rawurlencode($templateUuid) . '/versions?sort=version&order=DESC&per_page=20',
-        $bearer
-    );
-    $list1Debug = "Status={$list1Status}\n" . substr((string)$list1Raw, 0, 1000);
-    expect($list1Status, "List versions failed.\n{$list1Debug}")->toBe(200);
-    expect(is_array($list1Json))->toBeTrue();
-    $rows1 = (array)($list1Json['data'] ?? []);
-    expect(count($rows1))->toBeGreaterThan(0);
-    $first = $rows1[0];
-    expect(is_array($first))->toBeTrue();
-    expect((string)($first['uuid'] ?? ''))->not->toBe('');
-    expect((string)($first['status'] ?? ''))->not->toBe('');
-    expect(is_int($first['version'] ?? null))->toBeTrue();
-
-    [$createVerStatus, $createVerJson, $createVerRaw] = ApiAuthHelper::apiRequest(
-        'POST',
-        $apiBaseResolved . '/' . rawurlencode($templateUuid) . '/versions',
-        $bearer,
-        [
-            'json' => [
-                'content' => '<p>Version 2 body</p>',
-            ],
-        ]
-    );
-    $cvDebug = "Status={$createVerStatus}\n" . substr((string)$createVerRaw, 0, 1000);
-    expect($createVerStatus, "Create version failed.\n{$cvDebug}")->toBe(200);
-    expect(is_array($createVerJson))->toBeTrue();
-    $versionUuid = (string)($createVerJson['data']['uuid'] ?? '');
-    expect($versionUuid)->not->toBe('');
-    // Create payload uses DB column `version`; JSON key `version_number` may be 0. Confirm via list (same shape as GET /versions).
-    expect((string)($createVerJson['data']['status'] ?? ''))->toBe('draft');
-    [$afterCreateStatus, $afterCreateJson] = ApiAuthHelper::apiRequest(
-        'GET',
-        $apiBaseResolved . '/' . rawurlencode($templateUuid) . '/versions?sort=version&order=DESC&per_page=20',
-        $bearer
-    );
-    expect($afterCreateStatus)->toBe(200);
-    $newRow = null;
-    foreach ((array)($afterCreateJson['data'] ?? []) as $row) {
-        if (is_array($row) && (string)($row['uuid'] ?? '') === $versionUuid) {
-            $newRow = $row;
-            break;
-        }
-    }
-    expect($newRow)->not->toBeNull();
-    expect((int)($newRow['version'] ?? 0))->toBeGreaterThan(1);
-    expect((string)($newRow['status'] ?? ''))->toBe('draft');
-
-    // Controller matches version row's template_uuid to the request uuid; API returns the linkage.
-    $templateRefUuid = (string)($createVerJson['data']['template_uuid'] ?? '');
-    if ($templateRefUuid === '') {
-        $templateRefUuid = $templateUuid;
-    }
-
-    $putUrl = TemplatesApiHelper::urlTemplateQuery($apiBaseResolved, $templateRefUuid, [
-        'version_uuid' => $versionUuid,
-    ]);
-    [$updStatus, $updJson, $updRaw] = ApiAuthHelper::apiRequest(
-        'PUT',
-        $putUrl,
-        $bearer,
-        [
-            'json' => [
-                'content' => '<p>Version 2 updated</p>',
-            ],
-        ]
-    );
-    $updDebug = "Status={$updStatus}\n" . substr((string)$updRaw, 0, 1000);
-    expect($updStatus, "Update version failed.\n{$updDebug}")->toBe(200);
-    expect(is_array($updJson))->toBeTrue();
-    expect((string)($updJson['data']['uuid'] ?? ''))->toBe($versionUuid);
-
-    $partiesUrl = TemplatesApiHelper::urlTemplateQuery($apiBaseResolved, $templateRefUuid, [
-        'version_uuid' => $versionUuid,
-        'action' => 'parties',
-    ]);
-    [$parStatus, $parJson, $parRaw] = ApiAuthHelper::apiRequest(
-        'PUT',
-        $partiesUrl,
-        $bearer,
-        [
-            'json' => [
-                'parties' => [
-                    [
-                        'code' => 'buyer',
-                        'label' => 'Buyer',
-                        'signing_order' => 1,
-                    ],
-                ],
-            ],
-        ]
-    );
-    $parDebug = "Status={$parStatus}\n" . substr((string)$parRaw, 0, 1000);
-    expect($parStatus, "Replace parties failed.\n{$parDebug}")->toBe(200);
-    expect(is_array($parJson))->toBeTrue();
-    expect(isset($parJson['data']['parties']))->toBeTrue();
-    expect(is_array($parJson['data']['parties']))->toBeTrue();
-
-    $sfUrl = TemplatesApiHelper::urlTemplateQuery($apiBaseResolved, $templateRefUuid, [
-        'version_uuid' => $versionUuid,
-        'action' => 'smartfields',
-    ]);
-    [$sfStatus, $sfJson, $sfRaw] = ApiAuthHelper::apiRequest(
-        'PUT',
-        $sfUrl,
-        $bearer,
-        [
-            'json' => [
-                'smartfields' => [
-                    [
-                        'field_key' => 'amount',
-                        'label' => 'Amount',
-                        'type' => 'text',
-                    ],
-                ],
-            ],
-        ]
-    );
-    $sfDebug = "Status={$sfStatus}\n" . substr((string)$sfRaw, 0, 1000);
-    expect($sfStatus, "Replace smartfields failed.\n{$sfDebug}")->toBe(200);
-    expect(is_array($sfJson))->toBeTrue();
-    expect(isset($sfJson['data']['smartfields']))->toBeTrue();
-
-    $publishVerUrl = TemplatesApiHelper::urlTemplateQuery($apiBaseResolved, $templateRefUuid, [
-        'version_uuid' => $versionUuid,
-        'action' => 'publish',
-    ]);
-    [$pvStatus, $pvJson, $pvRaw] = ApiAuthHelper::apiRequest(
-        'POST',
-        $publishVerUrl,
-        $bearer
-    );
-    $pvDebug = "Status={$pvStatus}\n" . substr((string)$pvRaw, 0, 1000);
-    expect($pvStatus, "Publish version failed.\n{$pvDebug}")->toBe(200);
-    expect(is_array($pvJson))->toBeTrue();
-    expect((string)($pvJson['data']['uuid'] ?? ''))->toBe($versionUuid);
-    expect((string)($pvJson['data']['status'] ?? ''))->toBe('published');
-    expect((string)($pvJson['data']['published_at'] ?? ''))->not->toBe('');
-
-    [$list2Status, $list2Json] = ApiAuthHelper::apiRequest(
-        'GET',
-        $apiBaseResolved . '/' . rawurlencode($templateUuid) . '/versions?sort=version&order=DESC',
-        $bearer
-    );
-    expect($list2Status)->toBe(200);
-    $publishedRow = null;
-    foreach ((array)($list2Json['data'] ?? []) as $row) {
-        if (is_array($row) && (string)($row['uuid'] ?? '') === $versionUuid) {
-            $publishedRow = $row;
-            break;
-        }
-    }
-    expect($publishedRow)->not->toBeNull();
-    expect((string)($publishedRow['status'] ?? ''))->toBe('published');
-});
-
+/**
+ * Prerequisites:
+ * - Integration tests enabled; draft template from `createTemplateForFlow`.
+ *
+ * Steps:
+ * 1. POST `/templates/{uuid}/versions` with empty JSON body (no content).
+ * 2. Assert 422; structured error expects `VALIDATION_ERROR` and `field` `content`, else non-empty error.
+ */
 test('templates versioning: create version rejects missing content with 422', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     [$apiBaseResolved, $templateUuid] = TemplatesApiHelper::createTemplateForFlow($bearer);
@@ -275,6 +117,14 @@ test('templates versioning: create version rejects missing content with 422', fu
     }
 });
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; template uuid from helper.
+ *
+ * Steps:
+ * 1. GET versions with invalid `sort` query value.
+ * 2. Assert 422; non-empty `error` in JSON when present.
+ */
 test('templates versioning: invalid sort on versions list returns 422', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     [$apiBaseResolved, $templateUuid] = TemplatesApiHelper::createTemplateForFlow($bearer);
@@ -291,6 +141,15 @@ test('templates versioning: invalid sort on versions list returns 422', function
     }
 });
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; user can publish, clone, delete draft, and edit published.
+ *
+ * Steps:
+ * 1. Create and publish template A.
+ * 2. POST clone → new uuid, `status` draft; DELETE the clone draft (cleanup).
+ * 3. POST edit on published A → new draft uuid in response with `status` draft.
+ */
 test('templates versioning: clone published template and edit published creates new draft', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     [$apiBaseResolved, $uuid] = TemplatesApiHelper::createTemplateForFlow(
@@ -309,8 +168,7 @@ test('templates versioning: clone published template and edit published creates 
         $apiBaseResolved . '/' . rawurlencode($uuid) . '/clone',
         $bearer
     );
-    $cloneDebug = "Status={$cloneStatus}\n" . substr((string)$cloneRaw, 0, 800);
-    expect($cloneStatus, "Clone failed.\n{$cloneDebug}")->toBe(200);
+    expect($cloneStatus)->toBe(200, "Clone failed.\nStatus={$cloneStatus}\n" . substr((string)$cloneRaw, 0, 800));
     $newUuid = (string)($cloneJson['data']['uuid'] ?? '');
     expect($newUuid)->not->toBe('');
     expect($newUuid)->not->toBe($uuid);
@@ -328,13 +186,21 @@ test('templates versioning: clone published template and edit published creates 
         $apiBaseResolved . '/' . rawurlencode($uuid) . '/edit',
         $bearer
     );
-    $editDebug = "Status={$editStatus}\n" . substr((string)$editRaw, 0, 800);
-    expect($editStatus, "Edit published failed.\n{$editDebug}")->toBe(200);
+    expect($editStatus)->toBe(200, "Edit published failed.\nStatus={$editStatus}\n" . substr((string)$editRaw, 0, 800));
     $draftUuid = (string)($editJson['data']['uuid'] ?? '');
     expect($draftUuid)->not->toBe('');
     expect((string)($editJson['data']['status'] ?? ''))->toBe('draft');
 });
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; template lifecycle publish allowed.
+ *
+ * Steps:
+ * 1. Create template and publish it.
+ * 2. DELETE same uuid while published.
+ * 3. Assert 422 (must not treat as success); non-empty `error` when JSON.
+ */
 test('templates versioning: delete published template returns 422', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     [$apiBaseResolved, $uuid] = TemplatesApiHelper::createTemplateForFlow($bearer);

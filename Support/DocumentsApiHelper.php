@@ -72,7 +72,7 @@ final class DocumentsApiHelper
             'flow-test.pdf'
         );
 
-        expect($createStatus, 'Create response: ' . substr($createRaw, 0, 500))->toBe(200);
+        expect($createStatus)->toBe(200, 'Create response: ' . substr($createRaw, 0, 500));
         expect(is_array($createJson))->toBeTrue();
         $uuid = (string)($createJson['data']['uuid'] ?? '');
         expect($uuid)->not->toBe('');

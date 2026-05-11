@@ -7,6 +7,13 @@ require_once __DIR__ . '/../../../Support/ApiAuthHelper.php';
 require_once __DIR__ . '/../../../Support/TemplatesApiHelper.php';
 
 if (SKIP_INTEGRATION_TESTS) {
+    /**
+     * Prerequisites:
+     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php`.
+     *
+     * Steps:
+     * 1. Mark skipped; permission scenarios do not run.
+     */
     test('Skipping library permissions integration tests', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
@@ -18,11 +25,14 @@ beforeAll(function () {
 });
 
 /**
- * Library authorization and error paths. Write ops require @simplifi.ro + permission (controller).
- * TEST_USER_* accounts are @simplifi.ro — external-only 403 is documented; add a non-Simplifi test
- * account in config to extend this file.
+ * Prerequisites:
+ * - Integration tests enabled; `TemplatesApiHelper::assertRequiredConfigOrSkip()` in `beforeAll`.
+ * - Bearer for `TEST_USER_1_*`.
+ *
+ * Steps:
+ * 1. PATCH the library collection URL (unsupported method).
+ * 2. Assert 405; assert non-empty `error` in JSON or non-empty raw body.
  */
-
 test('library permissions: unsupported PATCH on collection returns 405', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
@@ -36,6 +46,14 @@ test('library permissions: unsupported PATCH on collection returns 405', functio
     }
 });
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; bearer for user with DELETE permission when applicable (403 → skip).
+ *
+ * Steps:
+ * 1. DELETE `/library/{unknownUuid}`.
+ * 2. Assert 404 (not success); if JSON, assert non-empty `error`.
+ */
 test('library permissions: DELETE unknown uuid returns 404', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
@@ -56,6 +74,14 @@ test('library permissions: DELETE unknown uuid returns 404', function () {
     }
 });
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; publish allowed for user when applicable (403 → skip).
+ *
+ * Steps:
+ * 1. POST publish on unknown library UUID.
+ * 2. Assert 404; non-empty `error` when JSON.
+ */
 test('library permissions: POST publish on unknown uuid returns 404', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
@@ -76,6 +102,14 @@ test('library permissions: POST publish on unknown uuid returns 404', function (
     }
 });
 
+/**
+ * Prerequisites:
+ * - Integration tests enabled; POST library allowed (403 → skip).
+ *
+ * Steps:
+ * 1. POST create with `name` and `content` but omit `language_id`.
+ * 2. Assert 422; structured error expects `VALIDATION_ERROR` and `field` `language_id`, else non-empty error.
+ */
 test('library permissions: POST create missing language_id returns 422', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();

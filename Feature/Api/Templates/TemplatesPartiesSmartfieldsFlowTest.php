@@ -7,6 +7,13 @@ require_once __DIR__ . '/../../../Support/ApiAuthHelper.php';
 require_once __DIR__ . '/../../../Support/TemplatesApiHelper.php';
 
 if (SKIP_INTEGRATION_TESTS) {
+    /**
+     * Prerequisites:
+     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php`.
+     *
+     * Steps:
+     * 1. Mark skipped; parties/smartfields flow does not run.
+     */
     test('Skipping templates parties/smartfields integration flow', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
@@ -18,10 +25,17 @@ beforeAll(function () {
 });
 
 /**
- * End-to-end CRUD for signers (parties) and smartfields on user templates:
- * POST create with parties + smartfields, GET, PUT replace both, GET, DELETE.
+ * Prerequisites:
+ * - Integration tests enabled; `TemplatesApiHelper::assertRequiredConfigOrSkip()` in `beforeAll`.
+ * - Bearer for `TEST_USER_1_*`.
+ *
+ * Steps:
+ * 1. POST create template with initial `parties` and `smartfields`; assert 200 and `data.uuid`.
+ * 2. GET template; assert party codes/labels/orders and smartfield keys/types.
+ * 3. PUT replace `parties` and `smartfields` via `updateTemplateForFlow`.
+ * 4. GET again; assert updated party count/order and smartfield `field_key`.
+ * 5. DELETE template; assert `data.deleted` true.
  */
-
 test('templates flow: create with parties and smartfields, update via PUT, verify on GET', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $apiBase = TemplatesApiHelper::apiBase();
@@ -55,8 +69,7 @@ test('templates flow: create with parties and smartfields, update via PUT, verif
         ],
         $apiBase
     );
-    $cDebug = "Status={$cSt}\n" . substr((string)$cRaw, 0, 1200);
-    expect($cSt, "Create with parties/smartfields failed.\n{$cDebug}")->toBe(200);
+    expect($cSt)->toBe(200, "Create with parties/smartfields failed.\nStatus={$cSt}\n" . substr((string)$cRaw, 0, 1200));
     expect(is_array($cJson))->toBeTrue();
     $uuid = (string)($cJson['data']['uuid'] ?? '');
     expect($uuid)->not->toBe('');
@@ -66,8 +79,7 @@ test('templates flow: create with parties and smartfields, update via PUT, verif
         $apiBase . '/' . rawurlencode($uuid),
         $bearer
     );
-    $g1Debug = "Status={$g1St}\n" . substr((string)$g1Raw, 0, 1500);
-    expect($g1St, "GET after create failed.\n{$g1Debug}")->toBe(200);
+    expect($g1St)->toBe(200, "GET after create failed.\nStatus={$g1St}\n" . substr((string)$g1Raw, 0, 1500));
     $p1 = (array)($g1Json['data']['parties'] ?? []);
     expect(count($p1))->toBe(1);
     expect((string)($p1[0]['code'] ?? ''))->toBe('customer');
@@ -115,8 +127,7 @@ test('templates flow: create with parties and smartfields, update via PUT, verif
         $apiBase . '/' . rawurlencode($uuid),
         $bearer
     );
-    $g2Debug = "Status={$g2St}\n" . substr((string)$g2Raw, 0, 1500);
-    expect($g2St, "GET after PUT failed.\n{$g2Debug}")->toBe(200);
+    expect($g2St)->toBe(200, "GET after PUT failed.\nStatus={$g2St}\n" . substr((string)$g2Raw, 0, 1500));
 
     $p2 = (array)($g2Json['data']['parties'] ?? []);
     expect(count($p2))->toBe(2);
@@ -133,6 +144,6 @@ test('templates flow: create with parties and smartfields, update via PUT, verif
         $apiBase . '/' . rawurlencode($uuid),
         $bearer
     );
-    expect($dSt, substr((string)$dRaw, 0, 600))->toBe(200);
+    expect($dSt)->toBe(200, substr((string)$dRaw, 0, 600));
     expect((bool)($dJson['data']['deleted'] ?? false))->toBeTrue();
 });

@@ -124,3 +124,46 @@ Use this decision rule:
 ---
 
 ## 11. Do NOT update models or controllers outside of the tests
+
+---
+
+## 12. Scenario documentation on every new Pest test (required)
+
+For **every** new `test('…', function () {` in Pest files under `tests/` (especially `tests/Feature`), add a **PHPDoc block immediately above** that `test(` call. Only whitespace may appear between the closing `*/` and `test(` — otherwise the admin Test Runner will not attach the text to the right test.
+
+### Why
+
+- The admin **Test Runner → Available tests** view parses these docblocks live (same naming as `pest --list-tests` via `Pest\Support\Str::evaluable`).
+- Reviewers and QA can open **View description** without reading the whole closure.
+
+### Format (copy this shape)
+
+Use **Prerequisites** and **Steps** so expectations and setup are obvious:
+
+```php
+/**
+ * Prerequisites:
+ * - Integration tests enabled (or skip branch documented) and any helper guards satisfied (e.g. `beforeAll` / `assertRequiredConfigOrSkip`).
+ * - Accounts or env vars this scenario depends on (e.g. `TEST_USER_1_*`, bearer + TOTP).
+ *
+ * Steps:
+ * 1. …
+ * 2. …
+ * 3. Assert … (status codes, `data.*` shape, non-empty `error` when failure is expected).
+ */
+test('feature area: concise behavior title', function () {
+    // …
+});
+```
+
+### Rules
+
+1. **One docblock per test** — the block must be the **last** `/** … */` before that `test(` (if you stack comments, only the one directly above `test(` is used).
+2. **Keep Steps aligned with the code** — update the doc when the test changes.
+3. **Security / negative tests** — state what must *not* happen (e.g. wrong user, wrong `sign_code`, non-200) in Steps.
+4. **Skipped suites** — the `if (SKIP_…) { test('Skipping …'); return; }` branch should still have a short docblock explaining when it runs.
+5. **PHPUnit class tests** — this automated extraction applies to **Pest** `test()` calls; for classic PHPUnit methods, keep a method docblock for humans even though the admin UI does not parse those today.
+
+### Example in the repo
+
+See `tests/Feature/Api/Signing/SigningFlowTest.php` for full-file examples of Prerequisites + Steps on each scenario.

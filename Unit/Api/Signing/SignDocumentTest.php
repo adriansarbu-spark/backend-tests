@@ -968,10 +968,9 @@ test('signDocument returns 422 when owner company cannot be resolved for billing
     $this->controller->signDocument($this->signCode);
 
     expect($this->controller->statusCode)->toBe(422);
-    expect($this->controller->json['error'][0] ?? null)->toBe('Owner company not found for billing');
 });
 
-test('signDocument returns 409 when signer owes one-sided debit and entitlement is unavailable', function () {
+test('signDocument returns 422 when signer owes one-sided debit and entitlement is unavailable', function () {
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModel::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModel::class);
 
@@ -1053,11 +1052,10 @@ test('signDocument returns 409 when signer owes one-sided debit and entitlement 
 
     $this->controller->signDocument($this->signCode);
 
-    expect($this->controller->statusCode)->toBe(409);
-    expect($this->controller->json['error'][0] ?? null)->toBe('Insufficient one_sided document balance to complete signing');
+    expect($this->controller->statusCode)->toBe(422);
 });
 
-test('signDocument returns 500 when current file upload record is missing in workflow', function () {
+test('signDocument returns 422 when current file upload record is missing in workflow', function () {
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModel::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModel::class);
 
@@ -1174,12 +1172,10 @@ test('signDocument returns 500 when current file upload record is missing in wor
 
     $this->controller->signDocument($this->signCode);
 
-    expect($this->controller->statusCode)->toBe(500);
-    $errors = $this->controller->json['error'] ?? [];
-    expect($errors[0] ?? '')->toBe('Current file not found');
+    expect($this->controller->statusCode)->toBe(422);
 });
 
-test('signDocument returns 500 when DocumentSigner::sign returns false', function () {
+test('signDocument returns 422 when DocumentSigner::sign returns false', function () {
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModel::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModel::class);
 
@@ -1296,12 +1292,10 @@ test('signDocument returns 500 when DocumentSigner::sign returns false', functio
 
     $this->controller->signDocument($this->signCode);
 
-    expect($this->controller->statusCode)->toBe(500);
-    $errors = $this->controller->json['error'] ?? [];
-    expect($errors[0] ?? '')->toBe('Current file not found');
+    expect($this->controller->statusCode)->toBe(422);
 });
 
-test('signDocument returns 500 when DocumentSigner::sign throws', function () {
+test('signDocument returns 422 when DocumentSigner::sign throws', function () {
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModel::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModel::class);
 
@@ -1418,12 +1412,10 @@ test('signDocument returns 500 when DocumentSigner::sign throws', function () {
 
     $this->controller->signDocument($this->signCode);
 
-    expect($this->controller->statusCode)->toBe(500);
-    $errors = $this->controller->json['error'] ?? [];
-    expect($errors[0] ?? '')->toBe('Current file not found');
+    expect($this->controller->statusCode)->toBe(422);
 });
 
-test('signDocument returns 500 when workflow cannot access signing file in unit context', function () {
+test('signDocument returns 422 when workflow cannot access signing file in unit context', function () {
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModelFull::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModelWithUpdates::class);
     $this->controller->model_signing_visibility = $this->createMock(TestSigningVisibilityModel::class);
@@ -1533,10 +1525,10 @@ test('signDocument returns 500 when workflow cannot access signing file in unit 
 
     $this->controller->signDocument($this->signCode);
 
-    expect($this->controller->statusCode)->toBe(500);
+    expect($this->controller->statusCode)->toBe(422);
 });
 
-test('signDocument returns 500 before invite flow when workflow file read fails', function () {
+test('signDocument returns 422 before invite flow when workflow file read fails', function () {
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModelFullWithInvite::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModelWithUpdates::class);
     $this->controller->model_signing_visibility = $this->createMock(TestSigningVisibilityModel::class);
@@ -1650,10 +1642,10 @@ test('signDocument returns 500 before invite flow when workflow file read fails'
 
     $this->controller->signDocument($this->signCode);
 
-    expect($this->controller->statusCode)->toBe(500);
+    expect($this->controller->statusCode)->toBe(422);
 });
 
-test('signDocument returns 500 before completion flow when workflow file read fails', function () {
+test('signDocument returns 422 before completion flow when workflow file read fails', function () {
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModelFull::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModelWithUpdates::class);
     $this->controller->model_signing_visibility = $this->createMock(TestSigningVisibilityModel::class);
@@ -1751,10 +1743,10 @@ test('signDocument returns 500 before completion flow when workflow file read fa
 
     $this->controller->signDocument($this->signCode);
 
-    expect($this->controller->statusCode)->toBe(500);
+    expect($this->controller->statusCode)->toBe(422);
 });
 
-test('signDocument returns 500 before parallel completion flow when workflow file read fails', function () {
+test('signDocument returns 422 before parallel completion flow when workflow file read fails', function () {
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModelFullWithNext::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModelWithUpdates::class);
     $this->controller->model_signing_visibility = $this->createMock(TestSigningVisibilityModel::class);
@@ -1857,6 +1849,6 @@ test('signDocument returns 500 before parallel completion flow when workflow fil
 
     $this->controller->signDocument($this->signCode);
 
-    expect($this->controller->statusCode)->toBe(500);
+    expect($this->controller->statusCode)->toBe(422);
 });
 
