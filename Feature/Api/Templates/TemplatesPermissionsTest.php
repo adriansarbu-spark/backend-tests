@@ -9,30 +9,39 @@ require_once __DIR__ . '/../../../Support/TemplatesApiHelper.php';
 if (SKIP_INTEGRATION_TESTS) {
     /**
      * Prerequisites:
-     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php`.
+     * - Integration tests are turned off in `tests_config.php` (`SKIP_INTEGRATION_TESTS` is true).
      *
      * Steps:
-     * 1. Mark skipped; templates permission scenarios do not run.
+     * 1. Mark this placeholder as skipped so no templates API calls run.
      */
-    test('Skipping templates permissions integration tests', function () {
+    test('Templates - integration tests are turned off for this run', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
     return;
 }
 
+/**
+ * File guard (runs once before any scenario in this file):
+ *
+ * Prerequisites:
+ * - Integration tests are on; templates API env matches `tests_config.php`.
+ *
+ * Steps:
+ * 1. Ask `TemplatesApiHelper` to confirm required configuration; if missing, skip the whole file with a clear reason.
+ */
 beforeAll(function () {
     TemplatesApiHelper::assertRequiredConfigOrSkip();
 });
 
 /**
  * Prerequisites:
- * - Integration tests enabled; two distinct test users (`TEST_USER_1_*`, `TEST_USER_2_*`).
+ * - Two different test accounts (`TEST_USER_1_*`, `TEST_USER_2_*`).
  *
  * Steps:
- * 1. User 1 creates private template.
- * 2. User 2 GET `/templates/{uuid}` → 403; assert non-empty `error` when JSON.
+ * 1. User A creates a **private** template.
+ * 2. User B tries to open it by id; expect **forbidden** (**HTTP 403**) and a non-empty **`error`** when JSON is returned.
  */
-test('templates permissions: non-owner denied on GET single private template', function () {
+test('Templates - someone else cannot open your private template', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 
@@ -55,13 +64,13 @@ test('templates permissions: non-owner denied on GET single private template', f
 
 /**
  * Prerequisites:
- * - Integration tests enabled; two users; `createTemplateForFlow` for user 1.
+ * - User A has a **private** template (helper).
  *
  * Steps:
- * 1. User 2 DELETE `/templates/{uuid}` on user 1’s private template.
- * 2. Assert 403 and non-empty `error` when JSON (resource must not be deleted by user 2).
+ * 1. User B tries to delete A’s template by id.
+ * 2. Expect **HTTP 403** and a non-empty **`error`** when JSON is returned (B must not remove A’s row).
  */
-test('templates permissions: non-owner denied on DELETE single private template', function () {
+test('Templates - someone else cannot delete your private template', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 
@@ -84,13 +93,13 @@ test('templates permissions: non-owner denied on DELETE single private template'
 
 /**
  * Prerequisites:
- * - Integration tests enabled; private template owned by user 1.
+ * - User A owns a **private** template.
  *
  * Steps:
- * 1. User 2 GET `/templates/{uuid}/versions` → 403; non-empty `error`.
- * 2. User 2 POST new version with JSON body → 403; non-empty `error`.
+ * 1. User B tries to list version history; expect **HTTP 403** and non-empty **`error`** when JSON is returned.
+ * 2. User B tries to add a version with a body; expect **HTTP 403** and non-empty **`error`**.
  */
-test('templates permissions: non-owner denied on versions list and create version (private template)', function () {
+test('Templates - someone else cannot list or add versions on your private template', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 
@@ -127,13 +136,13 @@ test('templates permissions: non-owner denied on versions list and create versio
 
 /**
  * Prerequisites:
- * - Integration tests enabled; user 1 private draft template.
+ * - User A has a **private** draft template.
  *
  * Steps:
- * 1. User 2 POST publish on user 1 template → 403; non-empty `error`.
- * 2. User 2 POST clone → 403; non-empty `error`.
+ * 1. User B tries to publish A’s template; expect **HTTP 403** and non-empty **`error`**.
+ * 2. User B tries to duplicate A’s template; expect **HTTP 403** and non-empty **`error`**.
  */
-test('templates permissions: non-owner denied on publish and clone (private template)', function () {
+test('Templates - someone else cannot publish or duplicate your private template', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 
@@ -165,13 +174,13 @@ test('templates permissions: non-owner denied on publish and clone (private temp
 
 /**
  * Prerequisites:
- * - Integration tests enabled; both users configured.
+ * - Two accounts; A can create a uniquely named **private** template.
  *
  * Steps:
- * 1. User 1 creates uniquely named private template; record `uuid`.
- * 2. User 2 GET `/templates` list; assert no item has that `uuid` (tenant isolation).
+ * 1. User A creates that template and keeps its id.
+ * 2. User B scrolls their own template list; B’s rows must **not** include A’s id (tenant isolation).
  */
-test('templates permissions: other user list does not contain foreign private template uuid', function () {
+test('Templates - another account’s list does not leak your private template id', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 
@@ -202,13 +211,13 @@ test('templates permissions: other user list does not contain foreign private te
 
 /**
  * Prerequisites:
- * - Integration tests enabled; valid bearer for `TEST_USER_1_*`.
+ * - Signed-in user with a normal templates session.
  *
  * Steps:
- * 1. PATCH templates collection URL.
- * 2. Assert 405; JSON `error` non-empty or raw body non-empty.
+ * 1. Send **PATCH** to the templates collection root (not supported).
+ * 2. Expect **method not allowed** (**HTTP 405**); JSON **`error`** non-empty or raw body non-empty.
  */
-test('templates permissions: unsupported PATCH on collection returns 405', function () {
+test('Templates - PATCH on the template collection is not supported', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $apiBase = TemplatesApiHelper::apiBase();
 

@@ -9,31 +9,39 @@ require_once __DIR__ . '/../../../Support/TemplatesApiHelper.php';
 if (SKIP_INTEGRATION_TESTS) {
     /**
      * Prerequisites:
-     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php`.
+     * - Integration tests are turned off in `tests_config.php` (`SKIP_INTEGRATION_TESTS` is true).
      *
      * Steps:
-     * 1. Mark skipped; permission scenarios do not run.
+     * 1. Mark this placeholder as skipped so no library API calls run.
      */
-    test('Skipping library permissions integration tests', function () {
+    test('Library - integration tests are turned off for this run', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
     return;
 }
 
+/**
+ * File guard (runs once before any scenario in this file):
+ *
+ * Prerequisites:
+ * - Integration tests are on; templates/library API env matches `tests_config.php`.
+ *
+ * Steps:
+ * 1. Ask `TemplatesApiHelper` to confirm required configuration; if missing, skip the whole file with a clear reason.
+ */
 beforeAll(function () {
     TemplatesApiHelper::assertRequiredConfigOrSkip();
 });
 
 /**
  * Prerequisites:
- * - Integration tests enabled; `TemplatesApiHelper::assertRequiredConfigOrSkip()` in `beforeAll`.
- * - Bearer for `TEST_USER_1_*`.
+ * - Signed-in user (`TEST_USER_1_*`); file guard passed (`beforeAll`).
  *
  * Steps:
- * 1. PATCH the library collection URL (unsupported method).
- * 2. Assert 405; assert non-empty `error` in JSON or non-empty raw body.
+ * 1. Send **PATCH** to the library collection root (unsupported).
+ * 2. Expect **HTTP 405**; JSON **`error`** non-empty or raw body non-empty.
  */
-test('library permissions: unsupported PATCH on collection returns 405', function () {
+test('Library - PATCH on the library collection is not supported', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
 
@@ -48,13 +56,13 @@ test('library permissions: unsupported PATCH on collection returns 405', functio
 
 /**
  * Prerequisites:
- * - Integration tests enabled; bearer for user with DELETE permission when applicable (403 → skip).
+ * - Library API reachable; user may delete when policy allows (**HTTP 403** on this call means the test skips).
  *
  * Steps:
- * 1. DELETE `/library/{unknownUuid}`.
- * 2. Assert 404 (not success); if JSON, assert non-empty `error`.
+ * 1. Try to delete a well-formed id that does not exist in the library.
+ * 2. Expect **not found** (**HTTP 404**); JSON **`error`** non-empty when present.
  */
-test('library permissions: DELETE unknown uuid returns 404', function () {
+test('Library - delete with an unknown id returns not found', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
     $fake = '00000000-0000-4000-8000-000000000088';
@@ -76,13 +84,13 @@ test('library permissions: DELETE unknown uuid returns 404', function () {
 
 /**
  * Prerequisites:
- * - Integration tests enabled; publish allowed for user when applicable (403 → skip).
+ * - Library API reachable; publish may be denied for the test user (**HTTP 403** means skip).
  *
  * Steps:
- * 1. POST publish on unknown library UUID.
- * 2. Assert 404; non-empty `error` when JSON.
+ * 1. Try to publish a well-formed id that is not in the library.
+ * 2. Expect **HTTP 404**; **`error`** non-empty when JSON is returned.
  */
-test('library permissions: POST publish on unknown uuid returns 404', function () {
+test('Library - publish with an unknown id returns not found', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
     $fake = '00000000-0000-4000-8000-000000000077';
@@ -104,13 +112,13 @@ test('library permissions: POST publish on unknown uuid returns 404', function (
 
 /**
  * Prerequisites:
- * - Integration tests enabled; POST library allowed (403 → skip).
+ * - User may POST library rows (**HTTP 403** means skip).
  *
  * Steps:
- * 1. POST create with `name` and `content` but omit `language_id`.
- * 2. Assert 422; structured error expects `VALIDATION_ERROR` and `field` `language_id`, else non-empty error.
+ * 1. Try to create a library entry with name and body but **no** language id.
+ * 2. Expect **HTTP 422**; structured responses should use **`VALIDATION_ERROR`** on **`language_id`**, otherwise any non-empty **`error`**.
  */
-test('library permissions: POST create missing language_id returns 422', function () {
+test('Library - create without language is rejected', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
 

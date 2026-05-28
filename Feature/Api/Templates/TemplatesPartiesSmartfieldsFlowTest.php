@@ -9,34 +9,42 @@ require_once __DIR__ . '/../../../Support/TemplatesApiHelper.php';
 if (SKIP_INTEGRATION_TESTS) {
     /**
      * Prerequisites:
-     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php`.
+     * - Integration tests are turned off in `tests_config.php` (`SKIP_INTEGRATION_TESTS` is true).
      *
      * Steps:
-     * 1. Mark skipped; parties/smartfields flow does not run.
+     * 1. Mark this placeholder as skipped so no templates API calls run.
      */
-    test('Skipping templates parties/smartfields integration flow', function () {
+    test('Templates - integration tests are turned off for this run', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
     return;
 }
 
+/**
+ * File guard (runs once before any scenario in this file):
+ *
+ * Prerequisites:
+ * - Integration tests are on; templates API env matches `tests_config.php`.
+ *
+ * Steps:
+ * 1. Ask `TemplatesApiHelper` to confirm required configuration; if missing, skip the whole file with a clear reason.
+ */
 beforeAll(function () {
     TemplatesApiHelper::assertRequiredConfigOrSkip();
 });
 
 /**
  * Prerequisites:
- * - Integration tests enabled; `TemplatesApiHelper::assertRequiredConfigOrSkip()` in `beforeAll`.
- * - Bearer for `TEST_USER_1_*`.
+ * - Signed-in owner (`TEST_USER_1_*`); file guard passed (`beforeAll`).
  *
  * Steps:
- * 1. POST create template with initial `parties` and `smartfields`; assert 200 and `data.uuid`.
- * 2. GET template; assert party codes/labels/orders and smartfield keys/types.
- * 3. PUT replace `parties` and `smartfields` via `updateTemplateForFlow`.
- * 4. GET again; assert updated party count/order and smartfield `field_key`.
- * 5. DELETE template; assert `data.deleted` true.
+ * 1. Create a template with signing parties and smartfields; expect **HTTP 200** and **`data.uuid`**.
+ * 2. Open the template; check party codes, labels, signing order, and smartfield keys/types.
+ * 3. Replace parties and smartfields with a save (helper).
+ * 4. Open again; counts, order, and **`field_key`** should match the update.
+ * 5. Delete the template; expect **`data.deleted`** true.
  */
-test('templates flow: create with parties and smartfields, update via PUT, verify on GET', function () {
+test('Templates - parties and smartfields round-trip on create, update, and read', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $apiBase = TemplatesApiHelper::apiBase();
     $name = 'Parties/SF flow ' . gmdate('YmdHis');

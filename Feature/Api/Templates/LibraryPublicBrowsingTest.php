@@ -9,31 +9,39 @@ require_once __DIR__ . '/../../../Support/TemplatesApiHelper.php';
 if (SKIP_INTEGRATION_TESTS) {
     /**
      * Prerequisites:
-     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php`.
+     * - Integration tests are turned off in `tests_config.php` (`SKIP_INTEGRATION_TESTS` is true).
      *
      * Steps:
-     * 1. Mark skipped; browsing scenarios do not run against the API.
+     * 1. Mark this placeholder as skipped so no library API calls run.
      */
-    test('Skipping library public browsing integration tests', function () {
+    test('Library - integration tests are turned off for this run', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
     return;
 }
 
+/**
+ * File guard (runs once before any scenario in this file):
+ *
+ * Prerequisites:
+ * - Integration tests are on; templates/library API env matches `tests_config.php`.
+ *
+ * Steps:
+ * 1. Ask `TemplatesApiHelper` to confirm required configuration; if missing, skip the whole file with a clear reason.
+ */
 beforeAll(function () {
     TemplatesApiHelper::assertRequiredConfigOrSkip();
 });
 
 /**
  * Prerequisites:
- * - Integration tests enabled; `TemplatesApiHelper::assertRequiredConfigOrSkip()` in `beforeAll`.
- * - Bearer for `TEST_USER_1_*`.
+ * - Signed-in user (`TEST_USER_1_*`); file guard passed (`beforeAll`).
  *
  * Steps:
- * 1. GET `/library` with pagination/sort query params.
- * 2. Assert 200, `data` is array; for first row with `uuid`, assert numeric/count fields and non-empty `status`, `category_code`.
+ * 1. Open the library list with normal pagination and sort.
+ * 2. Expect **HTTP 200** and **`data`** as an array; for the first row that has an id, check version and count fields look numeric and **`status`** / **`category_code`** are non-empty.
  */
-test('library browsing: GET list returns 200 with normalized items and pagination', function () {
+test('Library - list loads and first rows look well shaped', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
 
@@ -63,13 +71,13 @@ test('library browsing: GET list returns 200 with normalized items and paginatio
 
 /**
  * Prerequisites:
- * - Integration tests enabled; library API reachable; valid bearer.
+ * - Library API reachable with a normal session.
  *
  * Steps:
- * 1. GET `/library` with `category_code` and `language_id` filters.
- * 2. Assert 200 and `data` is an array.
+ * 1. Open the library list filtered by category and language.
+ * 2. Expect **HTTP 200** and **`data`** as an array.
  */
-test('library browsing: GET list accepts category_code and language_id query filters', function () {
+test('Library - list accepts category and language filters', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
 
@@ -85,13 +93,13 @@ test('library browsing: GET list accepts category_code and language_id query fil
 
 /**
  * Prerequisites:
- * - Integration tests enabled; at least one published library row (else skip).
+ * - At least one **published** library row exists (otherwise skip).
  *
  * Steps:
- * 1. GET published list; take first `uuid`.
- * 2. GET `/library/{uuid}`; assert 200, matching `data.uuid`, `parties`/`smartfields` arrays present, `can_archive` is bool.
+ * 1. Load the published list and take the first id.
+ * 2. Open that row; expect **HTTP 200**, matching **`data.uuid`**, **`parties`** / **`smartfields`** arrays present, and **`can_archive`** is a boolean.
  */
-test('library browsing: GET single returns parties and smartfields; can_archive is boolean', function () {
+test('Library - single item shows parties, smartfields, and archive flag', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
 
@@ -131,14 +139,14 @@ test('library browsing: GET single returns parties and smartfields; can_archive 
 
 /**
  * Prerequisites:
- * - Integration tests enabled; published library row available (else skip).
+ * - A **published** library id is available (otherwise skip).
  *
  * Steps:
- * 1. Resolve a library `uuid` from published list.
- * 2. GET `/library/{uuid}/versions` with sort/order/per_page.
- * 3. Assert 200, `data` array; first version row has non-empty `uuid`, `version_number`/`version` shape, non-empty `status`.
+ * 1. Resolve an id from the published list.
+ * 2. Open version history with sort, order, and page size.
+ * 3. Expect **HTTP 200** and **`data`** as an array; the first version row has a non-empty id, a version number field, and non-empty **`status`**.
  */
-test('library browsing: GET versions returns data array and pagination headers', function () {
+test('Library - version history returns rows for a published item', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
 
@@ -183,13 +191,13 @@ test('library browsing: GET versions returns data array and pagination headers',
 
 /**
  * Prerequisites:
- * - Integration tests enabled; valid bearer.
+ * - Normal signed-in session.
  *
  * Steps:
- * 1. GET `/library/{fakeUuid}` with a valid-format unknown UUID.
- * 2. Assert 404; if JSON `error` present, assert non-empty.
+ * 1. Open a well-formed library id that does not exist.
+ * 2. Expect **not found** (**HTTP 404**); **`error`** non-empty when JSON is returned.
  */
-test('library browsing: GET unknown library uuid returns 404', function () {
+test('Library - unknown id returns not found', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
     $fake = '00000000-0000-4000-8000-000000000099';

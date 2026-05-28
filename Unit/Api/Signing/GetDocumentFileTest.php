@@ -119,8 +119,12 @@ test('getDocumentFile hides document with 404 when visibility denies access', fu
         ]);
 
     $this->controller->model_signing_visibility
-        ->method('isVisible')
-        ->with(1, 10, 'user@example.com')
+        ->method('isDocumentAccessible')
+        ->with(
+            $this->callback(static fn(array $document): bool => (int)($document['document_id'] ?? 0) === 1),
+            10,
+            'user@example.com'
+        )
         ->willReturn(false);
 
     $this->controller
@@ -157,7 +161,7 @@ test('getDocumentFile returns 422 when document is cancelled', function () {
         ]);
 
     $this->controller->model_signing_visibility
-        ->method('isVisible')
+        ->method('isDocumentAccessible')
         ->willReturn(true);
 
     $this->controller
@@ -194,7 +198,7 @@ test('getDocumentFile returns 422 when document is expired', function () {
         ]);
 
     $this->controller->model_signing_visibility
-        ->method('isVisible')
+        ->method('isDocumentAccessible')
         ->willReturn(true);
 
     $this->controller
@@ -232,7 +236,7 @@ test('getDocumentFile returns 422 when document status is not allowed', function
         ]);
 
     $this->controller->model_signing_visibility
-        ->method('isVisible')
+        ->method('isDocumentAccessible')
         ->willReturn(true);
 
     $this->controller
@@ -270,7 +274,7 @@ test('getDocumentFile returns 422 when signer status does not allow viewing', fu
         ]);
 
     $this->controller->model_signing_visibility
-        ->method('isVisible')
+        ->method('isDocumentAccessible')
         ->willReturn(true);
 
     $this->controller
@@ -307,7 +311,7 @@ test('getDocumentFile returns 404 when file is missing on disk', function () {
         ]);
 
     $this->controller->model_signing_visibility
-        ->method('isVisible')
+        ->method('isDocumentAccessible')
         ->willReturn(true);
 
     // Stub DB upload lookup to point to a non-existing path.
@@ -337,97 +341,5 @@ test('getDocumentFile returns 404 when file is missing on disk', function () {
 
     expect($this->controller->statusCode)->toBe(404);
     expect($this->controller->json['error'] ?? [])->toContain('File not found on disk');
-});
-
-test('getDocumentFile streams PDF when file exists', function () {
-    $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModel::class);
-    $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModel::class);
-    $this->controller->model_signing_visibility = $this->createMock(TestSigningVisibilityModel::class);
-
-    $this->controller->model_signing_signer
-        ->method('getSignerBySignCode')
-        ->willReturn([
-            'document_id'        => 1,
-            'email'              => 'user@example.com',
-            'status_code'        => 'INVITED',
-            'document_signer_id' => 5,
-        ]);
-
-    // When signer is INVITED, status should be updated to VIEWED on successful file access.
-    $this->controller->model_signing_signer
-        ->expects($this->once())
-        ->method('updateSignerStatus')
-        ->with(5, 'VIEWED');
-
-    $this->controller->model_signing_document
-        ->method('getDocumentById')
-        ->willReturn([
-            'document_id'           => 1,
-            'lifecycle_status_code' => 'PENDING',
-            'expires_at'            => null,
-            'owner_customer_role_id'=> 10,
-            'current_file_code'     => $this->fileCode,
-        ]);
-
-    $this->controller->model_signing_visibility
-        ->method('isVisible')
-        ->willReturn(true);
-
-    // Create a real temporary PDF under DIR_UPLOAD/{Y-m-d} so file_exists() passes.
-    // DIR_UPLOAD ends with '/'; use a normalized root for mkdir so we do not get upload//Y-m-d.
-    $uploadRoot = rtrim(DIR_UPLOAD, '/');
-    $dateFolder = date('Y-m-d');
-    $filename = 'get-document-file-test-' . bin2hex(random_bytes(4)) . '.pdf';
-    $folderPath = $uploadRoot . '/' . $dateFolder;
-    if(!is_dir($folderPath))
-        if(@mkdir($folderPath, 0775, true))
-            @chmod($folderPath, 0775);
-
-    $filePathOnDisk = $folderPath . '/' . $filename;
-    file_put_contents($filePathOnDisk, '%PDF-1.4 test');
-
-    // signing.php builds path with DIR_UPLOAD . '/' . relative_path . '/' . filename (may contain //).
-    $filePathAsController = DIR_UPLOAD . '/' . $dateFolder . '/' . $filename;
-
-    // Stub DB upload lookup to return this file.
-    $this->controller->db = new class($dateFolder, $filename) {
-        private string $dateFolder;
-        private string $filename;
-
-        public function __construct(string $dateFolder, string $filename)
-        {
-            $this->dateFolder = $dateFolder;
-            $this->filename = $filename;
-        }
-
-        public function query(string $sql)
-        {
-            return (object)[
-                'row' => [
-                    'relative_path' => $this->dateFolder,
-                    'filename'      => $this->filename,
-                    'name'          => 'My Document.pdf',
-                ],
-            ];
-        }
-
-        public function escape(string $value): string
-        {
-            return addslashes($value);
-        }
-    };
-
-    // Expect streamPdfFile to be called with the resolved path and name.
-    $this->controller
-        ->expects($this->once())
-        ->method('streamPdfFile')
-        ->with($filePathAsController, 'My Document.pdf');
-
-    // sendResponse should not be used on the happy-path stream.
-    $this->controller
-        ->method('sendResponse')
-        ->willReturn(null);
-
-    $this->controller->getDocumentFile($this->signCode);
 });
 

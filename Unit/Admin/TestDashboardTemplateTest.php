@@ -8,22 +8,30 @@ test('admin tests dashboard template renders test history graph container', func
 
     expect($template)->not->toBeFalse();
     expect($template)->toContain('id="test-pass-history-graph"');
+    expect($template)->toContain('id="test-pass-history-detail"');
+    expect($template)->toContain('function initPassHistoryGraphDetailBindings()');
+    expect($template)->toContain('__passHistoryGraphDetailLines');
     expect($template)->toContain('id="pass-history-range-toggle"');
     expect($template)->toContain('function applyPassHistoryRange()');
     expect($template)->toContain('PASS_HISTORY_RANGE_MS');
+    expect($template)->toContain('PASS_HISTORY_MAX_X_DATE_LABELS = 5');
+    expect($template)->toContain('function buildPassHistoryXLabelIndices(points)');
+    expect($template)->toContain('function historyPointDateLabel(item)');
+    expect($template)->toContain('var xLabels = buildPassHistoryXLabelIndices(points);');
     expect($template)->toContain('function renderPassHistoryGraph(history, emptyMessage)');
     expect($template)->toContain('function summarizeHistoryPoint(item)');
     expect($template)->toContain('.test-history-point-hit');
     expect($template)->toContain("cursor: pointer;");
-    expect($template)->toContain('.test-history-point.is-hovered');
+    expect($template)->toContain('.test-history-point-group:hover .test-history-point');
+    expect($template)->toContain('.test-history-point-group:focus-within .test-history-point');
     expect($template)->toContain('<polyline fill="none" stroke="#337ab7" stroke-width="2" points="');
     expect($template)->toContain("class=\"test-history-point-hit\"");
     expect($template)->toContain("class=\"test-history-point\"");
-    expect($template)->toContain("$hit.on('mouseenter focus'");
-    expect($template)->toContain("$hit.on('mouseleave blur'");
-    expect($template)->toContain("var tooltip = 'Date: ' + formatHistoryTimestamp(item.timestamp)");
-    expect($template)->toContain("Total tests: ' + summary.total");
-    expect($template)->toContain("Pass percentage: ' + summary.passPercentage + '%';");
+    expect($template)->toContain('tabindex="0"');
+    expect($template)->toContain("window.__passHistoryGraphDetailLines = points.map(function(item) {");
+    expect($template)->toContain("return 'Date: ' + formatHistoryTimestamp(item.timestamp)");
+    expect($template)->toContain('+ \'\\nTotal tests: \' + summary.total');
+    expect($template)->toContain('+ \'\\nPass percentage: \' + summary.passPercentage + \'%\';');
     expect($template)->toContain('window.testPassHistory = {{ test_pass_history_json|raw }};');
     expect($template)->toContain('applyPassHistoryRange();');
 });
@@ -52,6 +60,16 @@ test('admin tests dashboard template renders run all button and run-all flow', f
     expect($template)->toContain("$('#run-all').on('click', function() {\n  runAllRequest();\n});");
 });
 
+test('admin tests dashboard skips file-level fallback when all targeted tests already passed', function () {
+    $templatePath = __DIR__ . '/../../../public/admin/view/template/tool/tests.twig';
+    $template = file_get_contents($templatePath);
+
+    expect($template)->not->toBeFalse();
+    expect($template)->toContain('var hasExplicitSkip = false');
+    expect($template)->toContain('if (!$fallbackRow)');
+    expect($template)->toContain("normalized.replace(/^[^\\s]+::/, '')");
+});
+
 test('admin tests dashboard template renders empty history state message', function () {
     $templatePath = __DIR__ . '/../../../public/admin/view/template/tool/tests.twig';
     $template = file_get_contents($templatePath);
@@ -62,9 +80,11 @@ test('admin tests dashboard template renders empty history state message', funct
     expect($language)->not->toBeFalse();
     expect($template)->toContain("window.textTestHistoryEmpty = '{{ text_test_history_empty|e('js') }}';");
     expect($template)->toContain("window.textTestHistoryEmptyRange = '{{ text_test_history_empty_range|e('js') }}';");
+    expect($template)->toContain('{{ text_test_history_detail_hint }}');
     expect($language)->toContain('$_[\'text_test_history_empty\'] = \'No test history available yet.\';');
     expect($language)->toContain('$_[\'text_test_history_empty_range\']');
     expect($language)->toContain('$_[\'text_test_history_range_30d\']');
+    expect($language)->toContain('$_[\'text_test_history_detail_hint\']');
 });
 
 test('admin tests dashboard template renders history export controls', function () {

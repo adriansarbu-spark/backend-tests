@@ -9,34 +9,42 @@ require_once __DIR__ . '/../../../Support/TemplatesApiHelper.php';
 if (SKIP_INTEGRATION_TESTS) {
     /**
      * Prerequisites:
-     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php` (full integration suite disabled for this run).
+     * - Integration tests are turned off in `tests_config.php` (`SKIP_INTEGRATION_TESTS` is true).
      *
      * Steps:
-     * 1. Register the scenario and mark skipped so CI/local runs stay green without calling the API.
+     * 1. Mark this placeholder as skipped so no templates or library API calls run.
      */
-    test('Skipping add-library-to-my-templates integration flow', function () {
+    test('Templates - integration tests are turned off for this run', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
     return;
 }
 
+/**
+ * File guard (runs once before any scenario in this file):
+ *
+ * Prerequisites:
+ * - Integration tests are on; templates/library API env matches `tests_config.php`.
+ *
+ * Steps:
+ * 1. Ask `TemplatesApiHelper` to confirm required configuration; if missing, skip the whole file with a clear reason.
+ */
 beforeAll(function () {
     TemplatesApiHelper::assertRequiredConfigOrSkip();
 });
 
 /**
  * Prerequisites:
- * - Integration tests enabled; `beforeAll` satisfied `TemplatesApiHelper::assertRequiredConfigOrSkip()`.
- * - `TEST_USER_1_*` credentials; bearer from `ApiAuthHelper::bearerTokenFor`.
- * - At least one published library row (otherwise the test skips).
+ * - Signed-in owner (`TEST_USER_1_*`); file guard passed (`beforeAll`).
+ * - At least one **published** library row exists (otherwise skip).
  *
  * Steps:
- * 1. GET library list with `status=published` and pick the first row’s `uuid` (and optional `name`).
- * 2. POST `.../library/{uuid}/add-to-my-templates`; assert 200, `data.uuid`, draft status, `version_number` 1, name when known.
- * 3. GET `/templates` and assert the new `uuid` appears in `data`.
- * 4. GET `/templates/{newUuid}`; assert `data` includes non-empty `content`, `parties`, `smartfields`, `visibility` private.
+ * 1. Pick the first published library item’s id (and name when present).
+ * 2. Add it to “my templates”; expect **HTTP 200**, a **new** template **`data.uuid`**, **`data.status`** **draft**, **`version_number`** **1**, and matching name when known.
+ * 3. Open the personal template list; the **new** id must appear in **`data`**.
+ * 4. Open that template by id; expect non-empty **`content`**, **`parties`** and **`smartfields`** arrays, and **`visibility`** **private**.
  */
-test('add library to my templates: POST creates draft and appears on GET /templates and GET /templates/{uuid}', function () {
+test('Templates - add from library creates a private draft in my templates', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
     $templatesBase = TemplatesApiHelper::apiBase();
@@ -131,14 +139,13 @@ test('add library to my templates: POST creates draft and appears on GET /templa
 
 /**
  * Prerequisites:
- * - Integration tests enabled and templates API config from `TemplatesApiHelper::assertRequiredConfigOrSkip()`.
- * - Valid bearer for `TEST_USER_1_*`.
+ * - Normal owner session for templates/library.
  *
  * Steps:
- * 1. POST add-to-my-templates with a syntactically valid but non-existent library UUID.
- * 2. Assert 404; if JSON has `error`, assert it is non-empty.
+ * 1. Try “add to my templates” with a well-formed library id that does not exist.
+ * 2. Expect **not found** (**HTTP 404**); **`error`** non-empty when JSON is returned.
  */
-test('add library to my templates: unknown library uuid returns 404', function () {
+test('Templates - add from library with unknown id returns not found', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
     $fakeUuid = '00000000-0000-4000-8000-000000000001';

@@ -5,40 +5,48 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../tests_config.php';
 require_once __DIR__ . '/../../../Support/ApiAuthHelper.php';
 require_once __DIR__ . '/../../../Support/SigningFlowHelper.php';
+require_once __DIR__ . '/../../../Support/DocumentsApiHelper.php';
 
 if (SKIP_INTEGRATION_TESTS) {
     /**
      * Prerequisites:
-     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php` (integration suite disabled).
+     * - Integration tests are turned off in `tests_config.php` (`SKIP_INTEGRATION_TESTS` is true).
      *
      * Steps:
-     * 1. Mark the file’s tests skipped so no signing API calls run.
+     * 1. Mark this placeholder as skipped so no signing API calls run.
      */
-    test('Skipping signing integration flow', function () {
+    test('Signing - integration tests are turned off for this run', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
     return;
 }
 
+/**
+ * File guard (runs once before any scenario in this file):
+ *
+ * Prerequisites:
+ * - Integration tests are enabled (`SKIP_INTEGRATION_TESTS` false); signing-related values in `tests_config.php` match the API under test.
+ * - `TEST_USER_1_PERSONAL_ROLE_UUID` and `TEST_USER_2_PERSONAL_ROLE_UUID` are set (used for POST /account/active-role before document flows).
+ *
+ * Steps:
+ * 1. Ask `SigningFlowHelper` to confirm required signing configuration is present; if not, skip the whole file with a clear reason so later tests do not fail mid-flow.
+ */
 beforeAll(function () {
     SigningFlowHelper::assertRequiredConfigOrSkip();
 });
 
 /**
  * Prerequisites:
- * - Integration tests enabled (`SKIP_INTEGRATION_TESTS` false) and signing env configured (`beforeAll`).
- * - `TEST_USER_1_EMAIL` / `TEST_USER_1_PASSWORD` / `TEST_USER_1_TOTP_SECRET` valid for the API under test.
+ * - Integration tests are on and the file guard passed (`beforeAll`); `TEST_USER_1_*` and `TEST_USER_1_PERSONAL_ROLE_UUID` in `tests_config.php`.
  *
  * Steps:
- * 1. Obtain bearer token for user 1 (document owner).
- * 2. Create a PDF document via API and capture its UUID.
- * 3. Clear annotations (none required for this path).
- * 4. Set signers to owner only, order 1, no outbound email.
- * 5. Resolve sign code for the owner’s email.
- * 6. Call sign with owner bearer + TOTP; assert HTTP 200 and response echoes the sign code.
+ * 1. Sign in, switch active role to the personal role, then upload a small PDF with a unique name.
+ * 2. Mark the owner as the only signer (no outbound email in this run).
+ * 3. Open the owner’s signing step and complete it with TOTP.
+ * 4. Check that signing succeeds (**HTTP 200**) and the response echoes the same signing link identifier the owner used (`data.sign_code`).
  */
-test('signing flow: owner creates and signs document', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+test('Signing - owner can create a document and complete their own signature', function () {
+    $user1Bearer = SigningFlowHelper::bearerForUser1();
     $uuid = SigningFlowHelper::createDocument(
         $user1Bearer,
         'sign-flow-' . gmdate('YmdHis') . '.pdf',
@@ -69,16 +77,17 @@ test('signing flow: owner creates and signs document', function () {
 
 /**
  * Prerequisites:
- * - Same as owner-sign path: user1 and user2 credentials + signing env (`beforeAll`).
+ * - Two different test accounts can sign in (`TEST_USER_1_*`, `TEST_USER_2_*`); signing env OK (`beforeAll`).
  *
  * Steps:
- * 1. User1 creates a document and sets themself as sole signer; obtain owner `sign_code`.
- * 2. Call `sign` as user2 with that code and user2’s TOTP.
- * 3. Assert HTTP is not 200 and JSON carries an authorization-style error (cross-tenant / wrong signer).
+ * 1. User A creates a document and is the only person on the signing list.
+ * 2. User B tries to complete User A’s signing step using A’s signing link and B’s own TOTP.
+ * 3. Check that signing does **not** succeed (status is not **HTTP 200**).
+ * 4. If the server returns JSON, check that an authorization-style **`error`** message is present so we do not pass on an empty body by mistake.
  */
-test('signing flow: other user cannot sign with owner sign_code', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+test('Signing - someone else cannot sign with the owner’s signing link', function () {
+    $user1Bearer = SigningFlowHelper::bearerForUser1();
+    $user2Bearer = SigningFlowHelper::bearerForUser2();
     $uuid = SigningFlowHelper::createDocument(
         $user1Bearer,
         'sign-flow-forbidden-' . gmdate('YmdHis') . '.pdf',
@@ -104,17 +113,17 @@ test('signing flow: other user cannot sign with owner sign_code', function () {
 
 /**
  * Prerequisites:
- * - User1 (sender) and user2 (receiver) accounts with TOTP; signing config OK.
+ * - Sender and invitee accounts with TOTP (`TEST_USER_1_*`, `TEST_USER_2_*`); signing config OK (`beforeAll`).
  *
  * Steps:
- * 1. User1 creates a named PDF, adds a signature annotation for user2, sets user2 as signer (`send_email` false in test).
- * 2. Send the document for signing.
- * 3. User2 waits for `sign_code` by document name and for signer file readiness.
- * 4. User2 signs with TOTP; assert 200 and `sign_code` echoed in response.
+ * 1. Sender uploads a PDF, places a signature field for the invitee, and sends the document for signing (email sending kept off in this test to avoid real mail).
+ * 2. Invitee waits until their signing link appears for that document name and the signer file is ready.
+ * 3. Invitee completes the signature with TOTP.
+ * 4. Check success (**HTTP 200**) and that the response echoes the invitee’s signing link in **`data.sign_code`**.
  */
-test('signing flow: sender sends to receiver and receiver can sign', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+test('Signing - invitee receives the document and can sign', function () {
+    $user1Bearer = SigningFlowHelper::bearerForUser1();
+    $user2Bearer = SigningFlowHelper::bearerForUser2();
 
     $documentName = 'sign-flow-user2-' . gmdate('YmdHis') . '.pdf';
     $uuid = SigningFlowHelper::createDocument(
@@ -168,16 +177,16 @@ test('signing flow: sender sends to receiver and receiver can sign', function ()
 
 /**
  * Prerequisites:
- * - User1 and user2 as in send/receive flow.
+ * - Same sender and invitee pairing as the basic send-and-sign flow.
  *
  * Steps:
- * 1. Same send pipeline: create PDF, annotation for user2, signers, send, user2 signs successfully.
- * 2. Sender GET `documents/{uuid}` — expect 200 and UUID in payload (owner view).
- * 3. Receiver GET signer-file by their `sign_code` — expect 200 and PDF magic bytes (`%PDF`).
+ * 1. Run the full send pipeline, then have the invitee sign successfully.
+ * 2. Sender opens the document by its stable id: expect a normal document view (**HTTP 200**) with the same **`data.uuid`**.
+ * 3. Invitee downloads their copy via the signer file endpoint: expect **HTTP 200** and bytes that look like a real PDF (**starts with `%PDF`**).
  */
-test('signing flow: receiver signs and sender and receiver can view the document', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+test('Signing - after signing, both sender and invitee can open the document', function () {
+    $user1Bearer = SigningFlowHelper::bearerForUser1();
+    $user2Bearer = SigningFlowHelper::bearerForUser2();
 
     $documentName = 'sign-flow-view-both-' . gmdate('YmdHis') . '.pdf';
     $uuid = SigningFlowHelper::createDocument(
@@ -217,14 +226,10 @@ test('signing flow: receiver signs and sender and receiver can view the document
     expect($signStatus)->toBe(200, 'Receiver sign failed. status=' . $signStatus . ' raw=' . substr($signRaw, 0, 700));
 
     // Sender (owner) can view by UUID
-    [$u1Status, $u1Json, $u1Raw] = ApiAuthHelper::apiRequest(
-        'GET',
-        API_URL . 'documents/' . rawurlencode($uuid),
-        $user1Bearer
-    );
+    [$u1Status, $u1Json, $u1Raw] = SigningFlowHelper::waitForOwnerDocumentGet($user1Bearer, $uuid);
     expect($u1Status)->toBe(200, 'Sender should be able to view document by UUID. ' . substr($u1Raw, 0, 700));
     expect(is_array($u1Json))->toBeTrue();
-    expect((string)($u1Json['data']['uuid'] ?? ''))->toBe($uuid);
+    expect(DocumentsApiHelper::documentUuidFromGetResponse($u1Json, $uuid))->toBe($uuid);
 
     // Receiver can view via signer file endpoint (UUID endpoints are owner-only)
     [$u2Status, , $u2Raw] = SigningFlowHelper::getSignerFile($user2Bearer, $user2SignCode);
@@ -234,17 +239,16 @@ test('signing flow: receiver signs and sender and receiver can view the document
 
 /**
  * Prerequisites:
- * - User1 and user2; ordered multi-signer flow supported by API.
+ * - Sender and invitee accounts; the API supports two ordered signers on one envelope.
  *
  * Steps:
- * 1. Create document with annotation for user2; signers: user1 order 1, user2 order 2 (`send_email` true for user2).
- * 2. Send document.
- * 3. User1 signs first with their `sign_code`; then user2’s code appears — user2 signs.
- * 4. Owner GET document by UUID — expect 200 and stable UUID (post-flow visibility).
+ * 1. Create a PDF with a field for the invitee, list sender first then invitee in signing order, and send (invitee may get email in real env; test keeps mail off where possible).
+ * 2. Sender completes their turn first; then the invitee’s signing step becomes available and they sign.
+ * 3. Sender opens the document again by id: expect **HTTP 200** and the same **`data.uuid`** so the envelope is still visible after everyone signed.
  */
-test('signing flow: sender and receiver both sign in signing order', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+test('Signing - sender and invitee each sign in the configured order', function () {
+    $user1Bearer = SigningFlowHelper::bearerForUser1();
+    $user2Bearer = SigningFlowHelper::bearerForUser2();
 
     $documentName = 'sign-flow-both-sign-' . gmdate('YmdHis') . '.pdf';
     $uuid = SigningFlowHelper::createDocument(
@@ -254,6 +258,15 @@ test('signing flow: sender and receiver both sign in signing order', function ()
     );
 
     SigningFlowHelper::setAnnotations($user1Bearer, $uuid, [[
+        'x' => 200,
+        'y' => 40,
+        'page' => 1,
+        'type' => 'SIGNATURE',
+        'email' => TEST_USER_1_EMAIL,
+        'width' => 200,
+        'height' => 80,
+        'required' => true,
+    ], [
         'x' => 340,
         'y' => 40,
         'page' => 1,
@@ -297,20 +310,25 @@ test('signing flow: sender and receiver both sign in signing order', function ()
     );
     expect($finalStatus)->toBe(200, 'Owner should be able to view final doc. ' . substr($finalRaw, 0, 700));
     expect(is_array($finalJson))->toBeTrue();
-    expect((string)($finalJson['data']['uuid'] ?? ''))->toBe($uuid);
+    expect(DocumentsApiHelper::documentUuidFromGetResponse($finalJson, $uuid))->toBe($uuid);
 });
 
+// if (defined('SKIP_USER_3_FAILED_TESTS') && SKIP_USER_3_FAILED_TESTS) {
+//     test('Signing - uncertified invitee check is disabled for this run', function () {
+//         $this->markTestSkipped('Uncertified-account signing tests are disabled');
+//     });
+// } else {
 /**
  * Prerequisites:
- * - `TEST_USER_3_*` configured as uncertified / non-qualified for signing (per env policy).
+ * - A third test account is configured as not qualified for signing in this environment (`TEST_USER_3_*` per `tests_config.php` / policy).
  *
  * Steps:
- * 1. User1 sends a document to user3 only (annotation + signer for user3).
- * 2. User3 obtains `sign_code` and signer file OK.
- * 3. Attempt sign as user3 with TOTP — expect failure (not HTTP 200): uncertified invitee must not complete signature.
+ * 1. Sender invites only that account to sign (field + signer list).
+ * 2. That account waits until a signing link exists and the signer file is ready.
+ * 3. They attempt to sign with TOTP; the signature must **not** complete successfully (status must **not** be **HTTP 200**).
  */
-test('signing flow: sender invites uncertified invitee who cannot sign (expected)', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+test('Signing - uncertified invitee cannot finish a signature (expected)', function () {
+    $user1Bearer = SigningFlowHelper::bearerForUser1();
     $user3Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_3_EMAIL, TEST_USER_3_PASSWORD);
 
     $documentName = 'sign-flow-user3-no-cert-' . gmdate('YmdHis') . '.pdf';
@@ -359,19 +377,20 @@ test('signing flow: sender invites uncertified invitee who cannot sign (expected
     );
 });
 
+
 /**
  * Prerequisites:
- * - User1 sender, user2 receiver; reject API available.
+ * - Sender and invitee accounts; decline (“reject”) is allowed for the invitee.
  *
  * Steps:
- * 1. Send document to user2; wait for `sign_code` and signer file.
- * 2. User2 rejects with TOTP — expect HTTP 200 on reject.
- * 3. Sender GET `documents/{uuid}` — 200 and UUID.
- * 4. Receiver GET signer-file by same `sign_code` — 200 and PDF bytes (still accessible after reject).
+ * 1. Send a document to the invitee and wait until they can open their signer file.
+ * 2. Invitee declines using TOTP; expect the decline call to succeed (**HTTP 200**).
+ * 3. Sender still sees the document by id (**HTTP 200**, same **`data.uuid`**).
+ * 4. Invitee can still download via their signing link (**HTTP 200** and PDF bytes **`%PDF`** in this environment).
  */
-test('signing flow: receiver can reject and sender and receiver can view the document', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+test('Signing - invitee can decline and both parties can still open the document', function () {
+    $user1Bearer = SigningFlowHelper::bearerForUser1();
+    $user2Bearer = SigningFlowHelper::bearerForUser2();
 
     $documentName = 'sign-flow-user2-reject-' . gmdate('YmdHis') . '.pdf';
     $uuid = SigningFlowHelper::createDocument(
@@ -421,7 +440,7 @@ test('signing flow: receiver can reject and sender and receiver can view the doc
     );
     expect($u1Status)->toBe(200, 'Sender should be able to view document after rejection. ' . substr($u1Raw, 0, 700));
     expect(is_array($u1Json))->toBeTrue();
-    expect((string)($u1Json['data']['uuid'] ?? ''))->toBe($uuid);
+    expect(DocumentsApiHelper::documentUuidFromGetResponse($u1Json, $uuid))->toBe($uuid);
 
     // Receiver can still view the file via sign_code (should generally remain accessible)
     [$u2FileStatus, , $u2FileRaw] = SigningFlowHelper::getSignerFile($user2Bearer, $user2SignCode);
@@ -431,15 +450,15 @@ test('signing flow: receiver can reject and sender and receiver can view the doc
 
 /**
  * Prerequisites:
- * - User1 and user2; same setup as reject + view.
+ * - Same sender and invitee setup as the decline-and-view scenario.
  *
  * Steps:
- * 1. Send to user2; reject successfully.
- * 2. Retry `sign` with the same `sign_code` — must not return 200 (signing closed after rejection).
+ * 1. Send to the invitee and have them decline successfully.
+ * 2. Invitee tries to sign afterward with the same signing link; signing must stay closed (status **not HTTP 200**).
  */
-test('signing flow: receiver rejects and then cannot sign', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+test('Signing - after declining, the invitee cannot sign using the same link', function () {
+    $user1Bearer = SigningFlowHelper::bearerForUser1();
+    $user2Bearer = SigningFlowHelper::bearerForUser2();
 
     $documentName = 'sign-flow-user2-reject-then-sign-' . gmdate('YmdHis') . '.pdf';
     $uuid = SigningFlowHelper::createDocument(
@@ -495,17 +514,17 @@ test('signing flow: receiver rejects and then cannot sign', function () {
 
 /**
  * Prerequisites:
- * - User1 can cancel own document; user2 is pending signer.
+ * - Sender may withdraw (cancel) their own envelope while the invitee is still pending.
  *
  * Steps:
- * 1. Send document to user2; wait for `sign_code` / signer file.
- * 2. User1 cancels document with TOTP — expect 200.
- * 3. Sender GET `documents/{uuid}` — 200.
- * 4. Receiver signer-file: accept 200 (PDF) or documented error statuses (403/404/422) with error payload when blocked.
+ * 1. Send to the invitee and wait until their signing link and signer file exist.
+ * 2. Sender withdraws the flow with TOTP; expect **HTTP 200**.
+ * 3. Sender still opens the document by id (**HTTP 200**, same **`data.uuid`**).
+ * 4. Invitee’s signer-file request may either return a PDF (**HTTP 200**, **`%PDF`**) or a documented refusal (**HTTP 403**, **404**, or **422**); if refused, JSON should carry a non-empty **`error`** message.
  */
-test('signing flow: sender cancels and sender and receiver can view the document', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+test('Signing - sender can withdraw the flow; both parties may still see the file depending on policy', function () {
+    $user1Bearer = SigningFlowHelper::bearerForUser1();
+    $user2Bearer = SigningFlowHelper::bearerForUser2();
 
     $documentName = 'sign-flow-user2-cancel-' . gmdate('YmdHis') . '.pdf';
     $uuid = SigningFlowHelper::createDocument(
@@ -555,7 +574,7 @@ test('signing flow: sender cancels and sender and receiver can view the document
     );
     expect($u1Status)->toBe(200, 'Sender should be able to view document after cancel. ' . substr($u1Raw, 0, 700));
     expect(is_array($u1Json))->toBeTrue();
-    expect((string)($u1Json['data']['uuid'] ?? ''))->toBe($uuid);
+    expect(DocumentsApiHelper::documentUuidFromGetResponse($u1Json, $uuid))->toBe($uuid);
 
     // Receiver view after cancel (behavior may vary: some envs block signer access after cancel)
     [$u2FileStatus, $u2FileJson, $u2FileRaw] = SigningFlowHelper::getSignerFile($user2Bearer, $user2SignCode);
@@ -579,15 +598,15 @@ test('signing flow: sender cancels and sender and receiver can view the document
 
 /**
  * Prerequisites:
- * - Same cancel authority as previous cancel test.
+ * - Sender can cancel while the invitee has not signed yet.
  *
  * Steps:
- * 1. Send to user2; user1 cancels while user2 still pending.
- * 2. User2 attempts `sign` with their `sign_code` — must not succeed (not HTTP 200).
+ * 1. Send to the invitee, then sender withdraws the envelope.
+ * 2. Invitee tries to sign; the attempt must **not** succeed (**not HTTP 200**).
  */
-test('signing flow: sender cancels and receiver cannot sign', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+test('Signing - after sender withdraws, the invitee cannot sign', function () {
+    $user1Bearer = SigningFlowHelper::bearerForUser1();
+    $user2Bearer = SigningFlowHelper::bearerForUser2();
 
     $documentName = 'sign-flow-user2-cancel-then-sign-' . gmdate('YmdHis') . '.pdf';
     $uuid = SigningFlowHelper::createDocument(
@@ -643,15 +662,15 @@ test('signing flow: sender cancels and receiver cannot sign', function () {
 
 /**
  * Prerequisites:
- * - `SigningFlowHelper::sentDocFromUser1ToUser2()` — user1 owner, user2 has receiver `sign_code`.
+ * - A standard “sent for signing” envelope from user 1 to user 2 already exists (helper builds PDF, fields, signers, and send so tests stay short).
  *
  * Steps:
- * 1. User1 calls `reject` using user2’s `sign_code` and user1 TOTP.
- * 2. Assert reject does not return 200 (sender must not act as receiver on that code); if 200, mark incomplete as security regression.
+ * 1. Sender tries to decline using the **invitee’s** signing link and sender TOTP.
+ * 2. Decline must **not** succeed (**not HTTP 200**); if it incorrectly returns **HTTP 200**, mark the test incomplete as a possible security regression.
  */
-test('signing sanity: sender cannot reject using receiver sign_code', function () {
+test('Signing - sender cannot decline on behalf of the invitee using their signing link', function () {
     [$uuid, $documentName, $user2SignCode] = SigningFlowHelper::sentDocFromUser1ToUser2();
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $user1Bearer = SigningFlowHelper::bearerForUser1();
 
     [$rejectStatus, $rejectJson, $rejectRaw] = SigningFlowHelper::reject(
         $user1Bearer,
@@ -672,15 +691,15 @@ test('signing sanity: sender cannot reject using receiver sign_code', function (
 
 /**
  * Prerequisites:
- * - Shared sent document: user1 owner, user2 invited signer (`sentDocFromUser1ToUser2`).
+ * - Same shared sent envelope: user 1 owns it, user 2 is the invited signer (helper setup).
  *
  * Steps:
- * 1. User2 calls `cancelDocument` on sender’s UUID with own TOTP.
- * 2. Assert HTTP is not 200 (receiver cannot cancel sender-owned flow).
+ * 1. Invitee tries to withdraw the sender’s document by id using their own TOTP.
+ * 2. That cancel attempt must **not** succeed (**not HTTP 200**).
  */
-test('signing sanity: receiver cannot cancel sender document', function () {
+test('Signing - invitee cannot cancel the sender’s document', function () {
     [$uuid, $documentName, $user2SignCode] = SigningFlowHelper::sentDocFromUser1ToUser2();
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $user2Bearer = SigningFlowHelper::bearerForUser2();
 
     [$cancelStatus, $cancelJson, $cancelRaw] = SigningFlowHelper::cancelDocument(
         $user2Bearer,
@@ -698,16 +717,16 @@ test('signing sanity: receiver cannot cancel sender document', function () {
 
 /**
  * Prerequisites:
- * - Shared sent document; user2 signs first in this test.
+ * - Shared sent envelope; this test first completes the invitee’s signature.
  *
  * Steps:
- * 1. User2 completes signature (precondition: HTTP 200).
- * 2. User1 attempts `reject` using user2’s `sign_code` — must not return 200 (no reject-after-complete for wrong role/code).
+ * 1. Invitee signs successfully (**HTTP 200** precondition).
+ * 2. Sender tries to decline using the invitee’s old signing link; decline must **not** succeed (**not HTTP 200**).
  */
-test('signing sanity: sender cannot reject after receiver signed', function () {
+test('Signing - sender cannot decline after the invitee has already signed', function () {
     [$uuid, $documentName, $user2SignCode] = SigningFlowHelper::sentDocFromUser1ToUser2();
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $user1Bearer = SigningFlowHelper::bearerForUser1();
+    $user2Bearer = SigningFlowHelper::bearerForUser2();
 
     [$signStatus, , $signRaw] = SigningFlowHelper::signWithRetry($user2Bearer, $user2SignCode, TEST_USER_2_TOTP_SECRET);
     expect($signStatus)->toBe(200, 'Precondition failed: receiver should sign. raw=' . substr((string)$signRaw, 0, 700));
@@ -728,15 +747,15 @@ test('signing sanity: sender cannot reject after receiver signed', function () {
 
 /**
  * Prerequisites:
- * - Shared sent document; user2 signs first.
+ * - Shared sent envelope; invitee will sign before the cancel attempt.
  *
  * Steps:
- * 1. User2 signs successfully.
- * 2. User2 attempts `cancelDocument` on the UUID — must not return 200 (receiver cannot cancel after signing).
+ * 1. Invitee completes their signature (**HTTP 200**).
+ * 2. Invitee tries to withdraw the envelope by id; cancel must **not** succeed (**not HTTP 200**).
  */
-test('signing sanity: receiver cannot cancel after receiver signed', function () {
+test('Signing - invitee cannot cancel after they have signed', function () {
     [$uuid, $documentName, $user2SignCode] = SigningFlowHelper::sentDocFromUser1ToUser2();
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $user2Bearer = SigningFlowHelper::bearerForUser2();
 
     [$signStatus, , $signRaw] = SigningFlowHelper::signWithRetry($user2Bearer, $user2SignCode, TEST_USER_2_TOTP_SECRET);
     expect($signStatus)->toBe(200, 'Precondition failed: receiver should sign. raw=' . substr((string)$signRaw, 0, 700));

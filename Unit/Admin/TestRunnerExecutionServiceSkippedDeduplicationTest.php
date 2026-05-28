@@ -3,35 +3,52 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../../public/system/library/test/TestRunnerExecutionService.php';
+require_once __DIR__ . '/../../../public/system/library/test/TestJUnitXmlParser.php';
 
-test('runner parser normalizes and deduplicates skipped tests before export pipeline', function () {
+test('junit parser provides file paths for skipped tests used by export dedupe', function () {
+    $xml = <<<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Tests\Feature\Api\Auth\LoginTest" file="tests/auth/LoginTest.php" tests="2" skipped="2">
+    <testcase name="Login test should skip when user is disabled" file="tests/auth/LoginTest.php::Login test should skip when user is disabled">
+      <skipped/>
+    </testcase>
+    <testcase name="Different skipped test" file="tests/auth/LoginTest.php::Different skipped test">
+      <skipped/>
+    </testcase>
+  </testsuite>
+</testsuites>
+XML;
+
+    $parser = new TestJUnitXmlParser();
+    $parsed = $parser->parse($xml, 'tests/auth', '/var/www/project');
     $service = new TestRunnerExecutionService('/tmp');
-    $reflection = new ReflectionClass(TestRunnerExecutionService::class);
-    $method = $reflection->getMethod('parseSkippedTestLines');
-    $method->setAccessible(true);
+    $deduped = $service->dedupeSkippedJson($parsed['skipped_results']);
 
-    $lines = array(
-        '/var/www/project/tests/auth/LoginTest.php',
-        '↩ Login test should skip when user is disabled',
-        '- login test should skip when user is disabled',
-        '- Login test should skip when user is disabled ',
-        '- tests/auth/Login test should skip when user is disabled',
-        '- Different skipped test'
+    expect($deduped)->toHaveCount(2);
+    expect($deduped[0]['file'] ?? null)->toBe('/var/www/project/tests/auth/LoginTest.php');
+});
+
+test('dedupeSkippedJson collapses duplicate rows from persisted skipped_json shape', function () {
+    $service = new TestRunnerExecutionService('/tmp');
+    $rows = array(
+        array(
+            'name' => 'Documents — uncertified account may upload or be blocked (environment…',
+            'message' => 'Test skipped',
+            'file' => '',
+            'target_folder' => 'tests/Feature/Api/Documents',
+        ),
+        array(
+            'name' => 'Documents — uncertified account may upload or be blocked (environment-specific)',
+            'message' => 'Test skipped',
+            'file' => '/var/www/api01.dev.simplifi.ro/tests/Feature/Api/Documents/DocumentsFlowTest.php',
+            'target_folder' => 'tests/Feature/Api/Documents',
+        ),
     );
 
-    $parsed = $method->invoke($service, $lines, 'tests/auth');
+    $deduped = $service->dedupeSkippedJson($rows);
 
-    expect($parsed)->toHaveCount(2);
-    expect($parsed)->toContainEqual(array(
-        'name' => 'Login test should skip when user is disabled',
-        'message' => 'Test skipped',
-        'file' => '/var/www/project/tests/auth/LoginTest.php',
-        'target_folder' => 'tests/auth'
-    ));
-    expect($parsed)->toContainEqual(array(
-        'name' => 'Different skipped test',
-        'message' => 'Test skipped',
-        'file' => '/var/www/project/tests/auth/LoginTest.php',
-        'target_folder' => 'tests/auth'
-    ));
+    expect($deduped)->toHaveCount(1);
+    expect($deduped[0]['name'] ?? null)->toBe('Documents — uncertified account may upload or be blocked (environment-specific)');
+    expect($deduped[0]['file'] ?? null)->toBe('/var/www/api01.dev.simplifi.ro/tests/Feature/Api/Documents/DocumentsFlowTest.php');
 });

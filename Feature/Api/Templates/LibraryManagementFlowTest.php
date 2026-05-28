@@ -9,35 +9,43 @@ require_once __DIR__ . '/../../../Support/TemplatesApiHelper.php';
 if (SKIP_INTEGRATION_TESTS) {
     /**
      * Prerequisites:
-     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php`.
+     * - Integration tests are turned off in `tests_config.php` (`SKIP_INTEGRATION_TESTS` is true).
      *
      * Steps:
-     * 1. Mark skipped so the file still lists a placeholder when integration is off.
+     * 1. Mark this placeholder as skipped so no library API calls run.
      */
-    test('Skipping library management integration flow', function () {
+    test('Library - integration tests are turned off for this run', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
     return;
 }
 
+/**
+ * File guard (runs once before any scenario in this file):
+ *
+ * Prerequisites:
+ * - Integration tests are on; templates/library API env matches `tests_config.php`.
+ *
+ * Steps:
+ * 1. Ask `TemplatesApiHelper` to confirm required configuration; if missing, skip the whole file with a clear reason.
+ */
 beforeAll(function () {
     TemplatesApiHelper::assertRequiredConfigOrSkip();
 });
 
 /**
  * Prerequisites:
- * - Integration tests enabled; `TemplatesApiHelper::assertRequiredConfigOrSkip()` passed in `beforeAll`.
- * - Bearer for `TEST_USER_1_*` with permission to POST/PUT/PUBLISH/ARCHIVE/DELETE on library (otherwise 403 skip on create).
+ * - User can create and manage library rows (**HTTP 403** on create means skip); `TEST_USER_1_*`.
  *
  * Steps:
- * 1. POST create library draft with name, language, content, category; assert 200 and `data.uuid`.
- * 2. GET library by uuid; assert name and `status` draft.
- * 3. PUT update `content`; assert 200.
- * 4. POST publish; assert `data.status` published.
- * 5. POST archive; assert `data.archived` true.
- * 6. DELETE; assert `data.deleted` true; GET same uuid returns 404.
+ * 1. Create a draft with name, language, body, and category; expect **HTTP 200** and **`data.uuid`**.
+ * 2. Open by id; name matches and **`data.status`** is **draft**.
+ * 3. Save a new body; expect **HTTP 200**.
+ * 4. Publish; **`data.status`** becomes **published**.
+ * 5. Archive; expect **`data.archived`** true.
+ * 6. Delete; expect **`data.deleted`** true; opening the same id afterward returns **HTTP 404**.
  */
-test('library management: create draft, GET, PUT update, publish, archive, delete', function () {
+test('Library - full lifecycle draft → publish → archive → delete', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
     $suffix = gmdate('YmdHis');
@@ -123,14 +131,13 @@ test('library management: create draft, GET, PUT update, publish, archive, delet
 
 /**
  * Prerequisites:
- * - Integration tests enabled; library API config OK; bearer for `TEST_USER_1_*`.
- * - POST library allowed for user (403 → skip).
+ * - User may POST library rows (**HTTP 403** means skip).
  *
  * Steps:
- * 1. POST create with `language_id` and `content` but omit `name`.
- * 2. Assert 422; if structured `error`, assert `VALIDATION_ERROR` and `field` `name`; else assert non-empty error payload.
+ * 1. Try to create with language and body but **no** name.
+ * 2. Expect **HTTP 422**; structured errors should use **`VALIDATION_ERROR`** on **`name`**, otherwise any non-empty **`error`**.
  */
-test('library management: create validation missing name returns 422 with field', function () {
+test('Library - create without name is rejected', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $libraryBase = TemplatesApiHelper::libraryApiBase();
 

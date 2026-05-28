@@ -61,6 +61,13 @@ beforeEach(function () {
             $this->loaded[] = $name;
             if ($name === 'billing/entitlement_signing') {
                 $this->controller->model_billing_entitlement_signing = new class {
+                    public function resolveDocumentOrganizationCompanyId($document)
+                    {
+                        $id = (int)($document['owner_company_id'] ?? 0);
+
+                        return $id > 0 ? $id : 456;
+                    }
+
                     public function getCompanyIdForOwnerCustomerRoleId($ownerCustomerRoleId)
                     {
                         return 456;
@@ -875,7 +882,7 @@ test('signDocument rejects when certificate is missing or not valid', function (
 
     // Simulate missing/invalid certificate.
     $this->controller->model_certificate_certificate = new class {
-        public function getCustomerCertificate($customerId)
+        public function getCustomerCertificateByUsage($customerId, $usage)
         {
             return null;
         }
@@ -958,6 +965,7 @@ test('signDocument returns 422 when owner company cannot be resolved for billing
         {
             if ($name === 'billing/entitlement_signing') {
                 $this->controller->model_billing_entitlement_signing = new class {
+                    public function resolveDocumentOrganizationCompanyId($document) { return 0; }
                     public function getCompanyIdForOwnerCustomerRoleId($ownerCustomerRoleId) { return 0; }
                     public function signerOwesOneSidedDebit($document, $signer) { return false; }
                 };
@@ -970,7 +978,7 @@ test('signDocument returns 422 when owner company cannot be resolved for billing
     expect($this->controller->statusCode)->toBe(422);
 });
 
-test('signDocument returns 422 when signer owes one-sided debit and entitlement is unavailable', function () {
+test('signDocument returns 409 when signer owes one-sided debit and entitlement is unavailable', function () {
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModel::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModel::class);
 
@@ -1040,6 +1048,7 @@ test('signDocument returns 422 when signer owes one-sided debit and entitlement 
         {
             if ($name === 'billing/entitlement_signing') {
                 $this->controller->model_billing_entitlement_signing = new class {
+                    public function resolveDocumentOrganizationCompanyId($document) { return 456; }
                     public function getCompanyIdForOwnerCustomerRoleId($ownerCustomerRoleId) { return 456; }
                     public function signerOwesOneSidedDebit($document, $signer) { return true; }
                     public function getBillingCompanyIdForSigningAct($document, $isOwner, $customerRoleId) { return 456; }
@@ -1052,10 +1061,11 @@ test('signDocument returns 422 when signer owes one-sided debit and entitlement 
 
     $this->controller->signDocument($this->signCode);
 
-    expect($this->controller->statusCode)->toBe(422);
+    expect($this->controller->statusCode)->toBe(409);
+    expect($this->controller->json['error'] ?? [])->toContain('insufficient_one_sided_document_balance');
 });
 
-test('signDocument returns 422 when current file upload record is missing in workflow', function () {
+test('signDocument returns 500 when current file upload record is missing in workflow', function () {
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModel::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModel::class);
 
@@ -1146,7 +1156,7 @@ test('signDocument returns 422 when current file upload record is missing in wor
         ->willReturn(456);
 
     $this->controller->model_certificate_certificate = new class {
-        public function getCustomerCertificate($customerId)
+        public function getCustomerCertificateByUsage($customerId, $usage)
         {
             return [
                 'cert_status'      => 'valid',
@@ -1172,10 +1182,10 @@ test('signDocument returns 422 when current file upload record is missing in wor
 
     $this->controller->signDocument($this->signCode);
 
-    expect($this->controller->statusCode)->toBe(422);
+    expect($this->controller->statusCode)->toBe(500);
 });
 
-test('signDocument returns 422 when DocumentSigner::sign returns false', function () {
+test('signDocument returns 500 when DocumentSigner::sign returns false', function () {
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModel::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModel::class);
 
@@ -1266,7 +1276,7 @@ test('signDocument returns 422 when DocumentSigner::sign returns false', functio
         ->willReturn(456);
 
     $this->controller->model_certificate_certificate = new class {
-        public function getCustomerCertificate($customerId)
+        public function getCustomerCertificateByUsage($customerId, $usage)
         {
             return [
                 'cert_status'      => 'valid',
@@ -1292,10 +1302,10 @@ test('signDocument returns 422 when DocumentSigner::sign returns false', functio
 
     $this->controller->signDocument($this->signCode);
 
-    expect($this->controller->statusCode)->toBe(422);
+    expect($this->controller->statusCode)->toBe(500);
 });
 
-test('signDocument returns 422 when DocumentSigner::sign throws', function () {
+test('signDocument returns 500 when DocumentSigner::sign throws', function () {
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModel::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModel::class);
 
@@ -1386,7 +1396,7 @@ test('signDocument returns 422 when DocumentSigner::sign throws', function () {
         ->willReturn(456);
 
     $this->controller->model_certificate_certificate = new class {
-        public function getCustomerCertificate($customerId)
+        public function getCustomerCertificateByUsage($customerId, $usage)
         {
             return [
                 'cert_status'      => 'valid',
@@ -1412,10 +1422,10 @@ test('signDocument returns 422 when DocumentSigner::sign throws', function () {
 
     $this->controller->signDocument($this->signCode);
 
-    expect($this->controller->statusCode)->toBe(422);
+    expect($this->controller->statusCode)->toBe(500);
 });
 
-test('signDocument returns 422 when workflow cannot access signing file in unit context', function () {
+test('signDocument returns 500 when workflow cannot access signing file in unit context', function () {
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModelFull::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModelWithUpdates::class);
     $this->controller->model_signing_visibility = $this->createMock(TestSigningVisibilityModel::class);
@@ -1489,7 +1499,7 @@ test('signDocument returns 422 when workflow cannot access signing file in unit 
     $this->controller->customer->method('getCompanyId')->willReturn(456);
 
     $this->controller->model_certificate_certificate = new class {
-        public function getCustomerCertificate($customerId)
+        public function getCustomerCertificateByUsage($customerId, $usage)
         {
             return [
                 'cert_status'        => 'valid',
@@ -1525,10 +1535,10 @@ test('signDocument returns 422 when workflow cannot access signing file in unit 
 
     $this->controller->signDocument($this->signCode);
 
-    expect($this->controller->statusCode)->toBe(422);
+    expect($this->controller->statusCode)->toBe(500);
 });
 
-test('signDocument returns 422 before invite flow when workflow file read fails', function () {
+test('signDocument returns 500 before invite flow when workflow file read fails', function () {
     $this->controller->model_signing_signer = $this->createMock(TestSigningSignerModelFullWithInvite::class);
     $this->controller->model_signing_document = $this->createMock(TestSigningDocumentModelWithUpdates::class);
     $this->controller->model_signing_visibility = $this->createMock(TestSigningVisibilityModel::class);
@@ -1594,7 +1604,7 @@ test('signDocument returns 422 before invite flow when workflow file read fails'
     $this->controller->customer->method('getCompanyId')->willReturn(456);
 
     $this->controller->model_certificate_certificate = new class {
-        public function getCustomerCertificate($customerId)
+        public function getCustomerCertificateByUsage($customerId, $usage)
         {
             return [
                 'cert_status'        => 'valid',
@@ -1642,7 +1652,7 @@ test('signDocument returns 422 before invite flow when workflow file read fails'
 
     $this->controller->signDocument($this->signCode);
 
-    expect($this->controller->statusCode)->toBe(422);
+    expect($this->controller->statusCode)->toBe(500);
 });
 
 test('signDocument returns 422 before completion flow when workflow file read fails', function () {
@@ -1707,7 +1717,7 @@ test('signDocument returns 422 before completion flow when workflow file read fa
     $this->controller->customer->method('getCompanyId')->willReturn(456);
 
     $this->controller->model_certificate_certificate = new class {
-        public function getCustomerCertificate($customerId)
+        public function getCustomerCertificateByUsage($customerId, $usage)
         {
             return [
                 'cert_status'        => 'valid',
@@ -1808,7 +1818,7 @@ test('signDocument returns 422 before parallel completion flow when workflow fil
     $this->controller->customer->method('getCompanyId')->willReturn(456);
 
     $this->controller->model_certificate_certificate = new class {
-        public function getCustomerCertificate($customerId)
+        public function getCustomerCertificateByUsage($customerId, $usage)
         {
             return [
                 'cert_status'        => 'valid',

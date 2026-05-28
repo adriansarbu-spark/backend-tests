@@ -133,6 +133,37 @@ test('test pass history service persists unit feature and overall result metadat
     expect($history[0]['feature']['status'] ?? null)->toBe('failed');
 });
 
+test('test pass history service persists export detail metadata', function () {
+    $dir = sys_get_temp_dir() . '/test-pass-history-' . uniqid('', true);
+    $path = $dir . '/test-pass-history.json';
+    $service = new TestPassHistoryService($path);
+
+    $warning = '';
+    $history = $service->upsertFromSummary([
+        'run_id' => 'run-export-meta',
+        'finished_at' => '2026-05-06T16:05:00Z',
+        'suite' => 'ALL',
+        'summary_json' => ['passed' => 2, 'failed' => 1, 'skipped' => 0],
+        'failed_json' => [['name' => 'Fails loudly', 'file' => '/var/www/tests/Unit/FooTest.php', 'message' => 'nope']],
+        'skipped_json' => [],
+        'passed_json' => [
+            ['name' => 'Alpha', 'file' => '/var/www/tests/Unit/Admin/AlphaTest.php'],
+            ['name' => 'Beta', 'file' => '/var/www/tests/Unit/Admin/BetaTest.php'],
+        ],
+        'provider_payload_json' => ['targets' => ['tests/Unit/Admin']],
+        'target_folder' => null,
+    ], $warning);
+
+    expect($warning)->toBe('');
+    expect($history[0]['summary_json']['failed'] ?? null)->toBe(1);
+    expect($history[0]['failed_json'][0]['name'] ?? null)->toBe('Fails loudly');
+    expect($history[0]['provider_payload_json']['targets'][0] ?? null)->toBe('tests/Unit/Admin');
+    expect($history[0]['passed_json'] ?? null)->toBe([
+        ['name' => 'Alpha', 'file' => '/var/www/tests/Unit/Admin/AlphaTest.php'],
+        ['name' => 'Beta', 'file' => '/var/www/tests/Unit/Admin/BetaTest.php'],
+    ]);
+});
+
 test('filterHistoryToLastDays keeps entries within the cutoff and drops older rows', function () {
     $dir = sys_get_temp_dir() . '/test-pass-history-' . uniqid('', true);
     $path = $dir . '/test-pass-history.json';

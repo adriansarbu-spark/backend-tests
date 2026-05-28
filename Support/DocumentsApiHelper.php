@@ -5,6 +5,76 @@ declare(strict_types=1);
 final class DocumentsApiHelper
 {
     /**
+     * Document uuid from GET /documents/{uuid} (legacy flat or group envelope).
+     */
+    public static function documentUuidFromGetResponse(array $json, ?string $requestedUuid = null): string
+    {
+        $data = $json['data'] ?? [];
+        if (!is_array($data)) {
+            return '';
+        }
+
+        if (!empty($data['uuid'])) {
+            return (string)$data['uuid'];
+        }
+
+        if ($requestedUuid !== null && $requestedUuid !== '') {
+            foreach ((array)($data['documents'] ?? []) as $doc) {
+                if ((string)($doc['uuid'] ?? '') === $requestedUuid) {
+                    return $requestedUuid;
+                }
+            }
+        }
+
+        $current = (string)($data['current_document_uuid'] ?? '');
+        if ($current !== '') {
+            return $current;
+        }
+
+        $documents = (array)($data['documents'] ?? []);
+        if (count($documents) === 1) {
+            return (string)($documents[0]['uuid'] ?? '');
+        }
+
+        return '';
+    }
+
+    /**
+     * sign_code for a signer email from GET /documents/{uuid} (legacy flat or group envelope).
+     */
+    public static function signCodeFromGetDocumentResponse(array $json, string $email): string
+    {
+        $data = $json['data'] ?? [];
+        if (!is_array($data)) {
+            return '';
+        }
+
+        $emailLower = strtolower(trim($email));
+
+        foreach ((array)($data['signers'] ?? []) as $signer) {
+            if (strtolower(trim((string)($signer['email'] ?? ''))) === $emailLower) {
+                $signCode = (string)($signer['sign_code'] ?? '');
+                if ($signCode !== '') {
+                    return $signCode;
+                }
+            }
+        }
+
+        foreach ((array)($data['documents'] ?? []) as $doc) {
+            foreach ((array)($doc['signers'] ?? []) as $signer) {
+                if (strtolower(trim((string)($signer['email'] ?? ''))) === $emailLower) {
+                    $signCode = (string)($signer['sign_code'] ?? '');
+                    if ($signCode !== '') {
+                        return $signCode;
+                    }
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /**
      * Upload a document (multipart) for integration tests.
      *
      * Unlike createDocumentForFlow(), this method returns raw status/json/raw so

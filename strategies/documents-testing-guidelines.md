@@ -4,6 +4,29 @@ This file contains general steps to write tests in this repository. It focuses o
 
 ---
 
+## Documents: reader-friendly descriptions (recommended)
+
+Use **`tests/Feature/Api/Documents/DocumentsFlowTest.php`** as the canonical example when you want **Prerequisites + numbered Steps** that read well for **non-developers** (QA, product, operations) while still being accurate for engineers.
+
+### What “reader-friendly” means here
+
+1. **Say what a person would notice first** - e.g. “the owner can download their PDF”, “someone else cannot open your document” - instead of leading with URL paths, internal helper names, or low-level HTTP jargon.
+2. **Keep the technical facts, but second** - when a step must mention HTTP status or a response field, put it in parentheses or at the end of the sentence (e.g. “access is refused (**HTTP 403** - forbidden)”, “the bytes look like a real PDF (**starts with `%PDF`**)”) so the story stays clear.
+3. **Prerequisites stay short and human** - describe *who* and *what must be true* (“integration tests are enabled”, “two different test accounts can sign in”, “a document already exists for the main user”) and only point to `tests_config.php` / flags when someone needs to reproduce or skip the scenario.
+4. **Steps are always numbered** - use `1.`, `2.`, `3.`, and add `4.`, `5.`, … whenever the scenario needs more beats. Each step should match one block of behavior in the test body so the docblock stays honest when code changes.
+5. **Test titles use the same voice** - prefer a **product area prefix** and an em dash, e.g. `Documents - owner can download their PDF`, instead of router-style names like `documents flow: … /file`. Titles still appear in `pest --list-tests` and the admin Test Runner, so they should read like a short checklist item.
+
+### Shared helpers
+
+If a file uses a lazy singleton or “run once” setup (e.g. `getDocumentsFlowManager()`), document it with **numbered steps** too: what runs the first time, what is reused on later calls, and why that saves repetition - still in plain language, with technical names only where they disambiguate.
+
+### Example in the repo
+
+- **`tests/Feature/Api/Documents/DocumentsFlowTest.php`** - end-to-end documents scenarios with the style above on every `test(` and on skip branches.
+- **`tests/Feature/Api/Signing/SigningFlowTest.php`** - same **Prerequisites + Steps** shape with a slightly more technical tone; use it when the audience is comfortable with signing-specific vocabulary.
+
+---
+
 ## 1. Start by classifying the test
 
 1. If you want to verify controller logic without relying on DB state, external services, or filesystem uploads, prefer a **Unit** test.
@@ -129,7 +152,7 @@ Use this decision rule:
 
 ## 12. Scenario documentation on every new Pest test (required)
 
-For **every** new `test('…', function () {` in Pest files under `tests/` (especially `tests/Feature`), add a **PHPDoc block immediately above** that `test(` call. Only whitespace may appear between the closing `*/` and `test(` — otherwise the admin Test Runner will not attach the text to the right test.
+For **every** new `test('…', function () {` in Pest files under `tests/` (especially `tests/Feature`), add a **PHPDoc block immediately above** that `test(` call. Only whitespace may appear between the closing `*/` and `test(` - otherwise the admin Test Runner will not attach the text to the right test.
 
 ### Why
 
@@ -151,19 +174,21 @@ Use **Prerequisites** and **Steps** so expectations and setup are obvious:
  * 2. …
  * 3. Assert … (status codes, `data.*` shape, non-empty `error` when failure is expected).
  */
-test('feature area: concise behavior title', function () {
+test('Documents - short behavior in everyday language', function () {
     // …
 });
 ```
 
+For **documents** flows specifically, prefer titles like `Documents - …` (see the “Documents: reader-friendly descriptions” section above).
+
 ### Rules
 
-1. **One docblock per test** — the block must be the **last** `/** … */` before that `test(` (if you stack comments, only the one directly above `test(` is used).
-2. **Keep Steps aligned with the code** — update the doc when the test changes.
-3. **Security / negative tests** — state what must *not* happen (e.g. wrong user, wrong `sign_code`, non-200) in Steps.
-4. **Skipped suites** — the `if (SKIP_…) { test('Skipping …'); return; }` branch should still have a short docblock explaining when it runs.
-5. **PHPUnit class tests** — this automated extraction applies to **Pest** `test()` calls; for classic PHPUnit methods, keep a method docblock for humans even though the admin UI does not parse those today.
+1. **One docblock per test** - the block must be the **last** `/** … */` before that `test(` (if you stack comments, only the one directly above `test(` is used).
+2. **Keep Steps aligned with the code** - update the doc when the test changes.
+3. **Security / negative tests** - state what must *not* happen (e.g. wrong user, wrong `sign_code`, non-200) in Steps.
+4. **Skipped suites** - the `if (SKIP_…) { test('Skipping …'); return; }` branch should still have a short docblock explaining when it runs.
+5. **PHPUnit class tests** - this automated extraction applies to **Pest** `test()` calls; for classic PHPUnit methods, keep a method docblock for humans even though the admin UI does not parse those today.
 
 ### Example in the repo
 
-See `tests/Feature/Api/Signing/SigningFlowTest.php` for full-file examples of Prerequisites + Steps on each scenario.
+See **`tests/Feature/Api/Documents/DocumentsFlowTest.php`** for reader-first wording on titles and Steps, and **`tests/Feature/Api/Signing/SigningFlowTest.php`** for full-file examples of Prerequisites + Steps on each scenario with a more technical tone where appropriate.

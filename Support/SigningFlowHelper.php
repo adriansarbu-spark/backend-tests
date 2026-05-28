@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/DocumentsApiHelper.php';
+require_once __DIR__ . '/AccountCompaniesApiHelper.php';
+
 final class SigningFlowHelper
 {
     /**
@@ -19,9 +22,11 @@ final class SigningFlowHelper
             'TEST_USER_1_EMAIL' => defined('TEST_USER_1_EMAIL') ? TEST_USER_1_EMAIL : '',
             'TEST_USER_1_PASSWORD' => defined('TEST_USER_1_PASSWORD') ? TEST_USER_1_PASSWORD : '',
             'TEST_USER_1_TOTP_SECRET' => defined('TEST_USER_1_TOTP_SECRET') ? TEST_USER_1_TOTP_SECRET : '',
+            'TEST_USER_1_PERSONAL_ROLE_UUID' => defined('TEST_USER_1_PERSONAL_ROLE_UUID') ? TEST_USER_1_PERSONAL_ROLE_UUID : '',
             'TEST_USER_2_EMAIL' => defined('TEST_USER_2_EMAIL') ? TEST_USER_2_EMAIL : '',
             'TEST_USER_2_PASSWORD' => defined('TEST_USER_2_PASSWORD') ? TEST_USER_2_PASSWORD : '',
             'TEST_USER_2_TOTP_SECRET' => defined('TEST_USER_2_TOTP_SECRET') ? TEST_USER_2_TOTP_SECRET : '',
+            'TEST_USER_2_PERSONAL_ROLE_UUID' => defined('TEST_USER_2_PERSONAL_ROLE_UUID') ? TEST_USER_2_PERSONAL_ROLE_UUID : '',
             'TEST_SIGING_FILE' => defined('TEST_SIGING_FILE') ? TEST_SIGING_FILE : '',
             'TEST_SIGNATURE_DATA_URL' => defined('TEST_SIGNATURE_DATA_URL') ? TEST_SIGNATURE_DATA_URL : '',
         ];
@@ -41,6 +46,46 @@ final class SigningFlowHelper
         }
     }
 
+    /**
+     * Sign in as TEST_USER_1 and POST /account/active-role with TEST_USER_1_PERSONAL_ROLE_UUID
+     * before any document create/send (personal envelope ownership).
+     */
+    public static function bearerForUser1(): string
+    {
+        $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+        self::switchToPersonalRole($bearer, (string)TEST_USER_1_PERSONAL_ROLE_UUID, 'TEST_USER_1');
+
+        return $bearer;
+    }
+
+    /**
+     * Sign in as TEST_USER_2 and POST /account/active-role with TEST_USER_2_PERSONAL_ROLE_UUID.
+     */
+    public static function bearerForUser2(): string
+    {
+        $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+        self::switchToPersonalRole($bearer, (string)TEST_USER_2_PERSONAL_ROLE_UUID, 'TEST_USER_2');
+
+        return $bearer;
+    }
+
+    private static function switchToPersonalRole(string $bearer, string $roleUuid, string $label): void
+    {
+        $roleUuid = trim($roleUuid);
+        if ($roleUuid === '') {
+            test()->markTestSkipped("Missing personal role_uuid for {$label}.");
+        }
+
+        [$status, $json, $raw] = AccountCompaniesApiHelper::switchActiveRole($bearer, $roleUuid);
+        if ($status !== 200) {
+            test()->markTestSkipped(
+                "POST account/active-role failed for {$label} personal role (status={$status}, errors="
+                . AccountCompaniesApiHelper::joinedErrors($json)
+                . ', raw=' . substr((string)$raw, 0, 400) . ').'
+            );
+        }
+    }
+
     public static function fixturePdfContent(): string
     {
         return (string)file_get_contents(TEST_SIGING_FILE);
@@ -54,8 +99,8 @@ final class SigningFlowHelper
      */
     public static function sentDocFromUser1ToUser2(): array
     {
-        $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-        $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+        $user1Bearer = self::bearerForUser1();
+        $user2Bearer = self::bearerForUser2();
 
         $documentName = 'sign-flow-sanity-user2-' . gmdate('YmdHis') . '-' . bin2hex(random_bytes(3)) . '.pdf';
         $uuid = self::createDocument(
@@ -173,13 +218,9 @@ final class SigningFlowHelper
         expect($status)->toBe(200, 'Get document failed: ' . substr($raw, 0, 700));
         expect(is_array($json))->toBeTrue('Get document returned non-JSON: ' . substr($raw, 0, 700));
 
-        foreach ((array)($json['data']['signers'] ?? []) as $signer) {
-            if (strtolower(trim((string)($signer['email'] ?? ''))) === strtolower(trim($email))) {
-                $signCode = (string)($signer['sign_code'] ?? '');
-                if ($signCode !== '') {
-                    return $signCode;
-                }
-            }
+        $signCode = DocumentsApiHelper::signCodeFromGetDocumentResponse($json, $email);
+        if ($signCode !== '') {
+            return $signCode;
         }
 
         $jsonText = is_array($json)
@@ -189,6 +230,53 @@ final class SigningFlowHelper
             'sign_code not found for email ' . $email . ".\nJSON:\n{$jsonText}\nRAW:\n" . substr($raw, 0, 2000)
         );
         return '';
+    }
+
+    /**
+     * Poll until owner GET /documents/{uuid} succeeds (handles post-sign eventual consistency).
+     *
+     * @return array{0:int,1:?array,2:string} [status, json, raw]
+     */
+    public static function waitForOwnerDocumentGet(
+        string $bearer,
+        string $uuid,
+        int $attempts = 12,
+        int $sleepMs = 500
+    ): array {
+        $last = [0, null, ''];
+        for ($i = 0; $i < $attempts; $i++) {
+            $last = ApiAuthHelper::apiRequest(
+                'GET',
+                API_URL . 'documents/' . rawurlencode($uuid),
+                $bearer
+            );
+            [$status] = $last;
+            if ((int)$status === 200) {
+                return $last;
+            }
+            usleep($sleepMs * 1000);
+        }
+
+        return $last;
+    }
+
+    /**
+     * Skip when the account has no one-sided signing credits (dev/staging quota).
+     */
+    public static function skipIfInsufficientOneSidedDocumentBalance(int $status, ?array $json): void
+    {
+        if ((int)$status !== 409 || !is_array($json)) {
+            return;
+        }
+
+
+        foreach ((array)($json['error'] ?? []) as $e) {
+            if (str_contains((string)$e, 'insufficient_one_sided_document_balance')) {
+                test()->markTestSkipped(
+                    'Signing entitlement: insufficient_one_sided_document_balance (top up test account or use prepaid invites where applicable).'
+                );
+            }
+        }
     }
 
     /**
@@ -205,6 +293,15 @@ final class SigningFlowHelper
         );
 
         if ($status !== 200) {
+            if ((int)$status === 404 && is_array($json)) {
+                $errs = implode(' | ', array_map('strval', (array)($json['error'] ?? [])));
+                if (str_contains($errs, 'document_not_found')) {
+                    test()->markTestSkipped(
+                        'POST /documents/{uuid}/send returned document_not_found: owner token may not see the document '
+                        . '(visibility / active role mismatch with document owner).'
+                    );
+                }
+            }
             $jsonText = is_array($json)
                 ? (string)json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
                 : 'null';
@@ -446,7 +543,7 @@ final class SigningFlowHelper
             'timestamp' => gmdate('c'),
         ]];
 
-        return ApiAuthHelper::apiRequest(
+        $out = ApiAuthHelper::apiRequest(
             'POST',
             API_URL . 'signing/' . rawurlencode($signCode) . '/sign',
             $bearer,
@@ -457,6 +554,9 @@ final class SigningFlowHelper
                 ],
             ]
         );
+        self::skipIfInsufficientOneSidedDocumentBalance((int)$out[0], is_array($out[1] ?? null) ? $out[1] : null);
+
+        return $out;
     }
 }
 

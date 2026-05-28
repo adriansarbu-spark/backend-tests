@@ -6,6 +6,52 @@ if (!defined('DB_PREFIX')) {
     define('DB_PREFIX', '');
 }
 
+// signing.php calls \ModelSigningSigner::isGuestInvitation() without going through $this->load->model.
+// Unit tests do not bootstrap the catalog model file, so provide the same static helpers as
+// catalog/model/signing/signer.php (invitation type resolution only).
+if (!class_exists('ModelSigningSigner', false)) {
+    class ModelSigningSigner {
+        public const INVITATION_STANDARD = 'standard_invitation';
+        public const INVITATION_GUEST = 'guest_invitation';
+        public const INVITATION_SPONSORED = 'sponsored_invitation';
+
+        public static function invitationTypeFromRow(array $row): string
+        {
+            $type = isset($row['invitation_type']) ? trim((string)$row['invitation_type']) : '';
+            if ($type === self::INVITATION_GUEST || $type === self::INVITATION_SPONSORED) {
+                return $type;
+            }
+            if (!empty($row['uses_prepaid_invite'])) {
+                return self::INVITATION_GUEST;
+            }
+
+            return self::INVITATION_STANDARD;
+        }
+
+        public static function isGuestInvitation(array $row): bool
+        {
+            return self::invitationTypeFromRow($row) === self::INVITATION_GUEST;
+        }
+
+        public static function isSponsoredInvitation(array $row): bool
+        {
+            return self::invitationTypeFromRow($row) === self::INVITATION_SPONSORED;
+        }
+
+        public static function isValidInvitationType($type): bool
+        {
+            return in_array($type, [self::INVITATION_STANDARD, self::INVITATION_GUEST, self::INVITATION_SPONSORED], true);
+        }
+    }
+}
+
+// signing.php passes \ModelCertificateCertificate::USAGE_DOCUMENT_SIGNING to the certificate model.
+if (!class_exists('ModelCertificateCertificate', false)) {
+    class ModelCertificateCertificate {
+        public const USAGE_DOCUMENT_SIGNING = 'document_signing';
+    }
+}
+
 if (!class_exists(TestableControllerPublicAPIV1Signing::class)) {
     class TestableControllerPublicAPIV1Signing extends ControllerPublicAPIV1Signing {
         public function getUploadRoot()
@@ -103,6 +149,11 @@ if (!class_exists(TestSigningSignerModelFullWithNext::class)) {
 if (!class_exists(TestSigningDocumentModel::class)) {
     class TestSigningDocumentModel {
         public function getDocumentById($documentId) {}
+        final public function canActAsDocumentOwner($customerRoleId, array $document) {
+            return (int)$customerRoleId > 0
+                && isset($document['owner_customer_role_id'])
+                && (int)$customerRoleId === (int)$document['owner_customer_role_id'];
+        }
         public function updateCurrentFileCode($documentId, $fileCode) {}
         public function sendDocument($documentId, $lockToken) {}
         public function completeDocument($documentId) {}
@@ -127,6 +178,7 @@ if (!class_exists(TestSigningDocumentModelWithReject::class)) {
 if (!class_exists(TestSigningVisibilityModel::class)) {
     class TestSigningVisibilityModel {
         public function isVisible($documentId, $customerRoleId, $email) {}
+        public function isDocumentAccessible(array $document, $customerRoleId, $email) {}
         public function updateCustomerRoleId($documentId, $email, $customerRoleId) {}
         public function createVisibility($documentId, $email, $customerRoleId) {}
     }

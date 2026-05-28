@@ -9,32 +9,40 @@ require_once __DIR__ . '/../../../Support/TemplatesApiHelper.php';
 if (SKIP_INTEGRATION_TESTS) {
     /**
      * Prerequisites:
-     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php`.
+     * - Integration tests are turned off in `tests_config.php` (`SKIP_INTEGRATION_TESTS` is true).
      *
      * Steps:
-     * 1. Mark skipped; templates CRUD scenarios do not run.
+     * 1. Mark this placeholder as skipped so no templates API calls run.
      */
-    test('Skipping templates CRUD integration flow', function () {
+    test('Templates - integration tests are turned off for this run', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
     return;
 }
 
+/**
+ * File guard (runs once before any scenario in this file):
+ *
+ * Prerequisites:
+ * - Integration tests are on; templates API env matches `tests_config.php`.
+ *
+ * Steps:
+ * 1. Ask `TemplatesApiHelper` to confirm required configuration; if missing, skip the whole file with a clear reason.
+ */
 beforeAll(function () {
     TemplatesApiHelper::assertRequiredConfigOrSkip();
 });
 
 /**
  * Prerequisites:
- * - Integration tests enabled; `TemplatesApiHelper::assertRequiredConfigOrSkip()` in `beforeAll`.
- * - Bearer for `TEST_USER_1_*`; templates API base from `TemplatesApiHelper::apiBase()`.
+ * - Signed-in owner (`TEST_USER_1_*`); file guard passed (`beforeAll`).
  *
  * Steps:
- * 1. `TemplatesApiHelper::rawCreateTemplate` with name, content, category, visibility private.
- * 2. Assert 200 and `data.uuid`.
- * 3. GET `/templates` list; find row by uuid; assert name, category, visibility, status, version and count fields.
+ * 1. Create a private template with name, body, and category via the helper.
+ * 2. Expect **HTTP 200** and a new **`data.uuid`**.
+ * 3. Open the owner’s template list and find that row; check name, category, visibility, status, version, party count, and smartfield count match what you created.
  */
-test('templates flow: owner can create template and see it in list', function () {
+test('Templates - owner can create a template and see it in their list', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $apiBase = TemplatesApiHelper::apiBase();
 
@@ -99,15 +107,15 @@ test('templates flow: owner can create template and see it in list', function ()
 
 /**
  * Prerequisites:
- * - Integration tests enabled; valid owner bearer.
+ * - Owner session is valid for the templates API.
  *
  * Steps:
- * 1. Create without `name` → 422; assert structured or non-empty `error`.
- * 2. Create without `content` → 422; field `content` when structured.
- * 3. Invalid `category_code` → 422; field `category_code` when structured.
- * 4. Non-array `parties` / `smartfields` → 422 with matching `field` when structured.
+ * 1. Try to create without a name; expect **HTTP 422** and a non-empty **`error`** (or structured **`VALIDATION_ERROR`** on **`name`**).
+ * 2. Try without body content; expect **HTTP 422** and **`content`** called out when structured.
+ * 3. Try with an invalid category code; expect **HTTP 422** and **`category_code`** when structured.
+ * 4. Send **`parties`** / **`smartfields`** as non-arrays; expect **HTTP 422** with the matching **`field`** when structured.
  */
-test('templates flow: create validation errors return 422 with code/field', function () {
+test('Templates - bad create payloads return validation errors', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $apiBase = TemplatesApiHelper::apiBase();
 
@@ -207,15 +215,15 @@ test('templates flow: create validation errors return 422 with code/field', func
 
 /**
  * Prerequisites:
- * - Integration tests enabled; `TemplatesApiHelper::createTemplateForFlow` succeeds for user 1.
+ * - Owner has a draft template from the helper.
  *
  * Steps:
- * 1. GET own draft by uuid; assert `parties`/`smartfields` keys in `data`.
- * 2. PUT update content and visibility via `updateTemplateForFlow`.
- * 3. GET again to confirm uuid still matches.
- * 4. DELETE; assert `data.deleted`; GET returns 404.
+ * 1. Open the draft by id; expect **HTTP 200** and **`data.parties`** / **`data.smartfields`** present.
+ * 2. Save changes to body and visibility (helper).
+ * 3. Open again; the same **`data.uuid`** should still be there.
+ * 4. Delete the draft; expect **`data.deleted`** true; a follow-up open by id should be **not found** (**HTTP 404**).
  */
-test('templates flow: owner can get, update and delete own draft template', function () {
+test('Templates - owner can open, edit, and remove their own draft', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
 
     [$apiBase, $uuid] = TemplatesApiHelper::createTemplateForFlow(
@@ -291,15 +299,15 @@ test('templates flow: owner can get, update and delete own draft template', func
 
 /**
  * Prerequisites:
- * - Integration tests enabled; `TEST_USER_1_*` and `TEST_USER_2_*` both configured.
+ * - Two different accounts (`TEST_USER_1_*`, `TEST_USER_2_*`).
  *
  * Steps:
- * 1. User 1 creates a private template; capture uuid.
- * 2. User 2 GET same uuid → 403 and non-empty `error` if JSON.
- * 3. User 2 PUT via `rawUpdateTemplate` → 403 and non-empty errors.
- * 4. User 2 DELETE → 403 and non-empty errors (owner’s template must still exist).
+ * 1. User A creates a **private** template and keeps its id.
+ * 2. User B tries to open it; expect **forbidden** (**HTTP 403**) and a non-empty **`error`** when JSON is returned.
+ * 3. User B tries to save changes; expect **HTTP 403** and errors.
+ * 4. User B tries to delete it; expect **HTTP 403** and errors (A’s template must still exist for A).
  */
-test('templates flow: non-owner receives 403 for GET/PUT/DELETE on private template', function () {
+test('Templates - someone else cannot read, edit, or delete your private draft', function () {
     $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
 

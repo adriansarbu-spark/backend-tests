@@ -9,32 +9,41 @@ require_once __DIR__ . '/../../../Support/TemplatesApiHelper.php';
 if (SKIP_INTEGRATION_TESTS) {
     /**
      * Prerequisites:
-     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php`.
+     * - Integration tests are turned off in `tests_config.php` (`SKIP_INTEGRATION_TESTS` is true).
      *
      * Steps:
-     * 1. Mark skipped; versioning scenarios do not run.
+     * 1. Mark this placeholder as skipped so no templates API calls run.
      */
-    test('Skipping templates versioning integration flow', function () {
+    test('Templates - integration tests are turned off for this run', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
     return;
 }
 
+/**
+ * File guard (runs once before any scenario in this file):
+ *
+ * Prerequisites:
+ * - Integration tests are on (`SKIP_INTEGRATION_TESTS` false); templates API env matches `tests_config.php`.
+ *
+ * Steps:
+ * 1. Ask `TemplatesApiHelper` to confirm required configuration; if missing, skip the whole file with a clear reason.
+ */
 beforeAll(function () {
     TemplatesApiHelper::assertRequiredConfigOrSkip();
 });
 
 /**
  * Prerequisites:
- * - Integration tests enabled; `createTemplateForFlow` succeeds for `TEST_USER_1_*`.
+ * - Signed-in owner (`TEST_USER_1_*`); helper can create a draft template (`createTemplateForFlow`).
  *
  * Steps:
- * 1. POST publish draft → 200; `data.status` published.
- * 2. POST publish again → 422; non-empty structured or string `error`.
- * 3. POST archive → 200; `data.status` archived.
- * 4. POST archive again → 422; non-empty `error`.
+ * 1. Publish the draft; expect success (**HTTP 200**) and **`data.status`** reads **published**.
+ * 2. Publish again; the second attempt must be refused (**HTTP 422**) with a non-empty **`error`** (structured or messages).
+ * 3. Archive once; expect **HTTP 200** and **`data.status`** **archived**.
+ * 4. Archive again; expect **HTTP 422** with non-empty **`error`** (invalid transition).
  */
-test('templates versioning: publish draft then archive; invalid transitions return 422', function () {
+test('Templates - publish then archive; repeat actions get a validation error', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     $apiBase = TemplatesApiHelper::apiBase();
 
@@ -91,13 +100,13 @@ test('templates versioning: publish draft then archive; invalid transitions retu
 
 /**
  * Prerequisites:
- * - Integration tests enabled; draft template from `createTemplateForFlow`.
+ * - A draft template exists for the owner (helper).
  *
  * Steps:
- * 1. POST `/templates/{uuid}/versions` with empty JSON body (no content).
- * 2. Assert 422; structured error expects `VALIDATION_ERROR` and `field` `content`, else non-empty error.
+ * 1. Try to add a new version with an empty body (no document body).
+ * 2. Expect refusal (**HTTP 422**); when the API returns structured validation, expect **`VALIDATION_ERROR`** on **`content`**, otherwise any non-empty **`error`** payload.
  */
-test('templates versioning: create version rejects missing content with 422', function () {
+test('Templates - new version without body is rejected', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     [$apiBaseResolved, $templateUuid] = TemplatesApiHelper::createTemplateForFlow($bearer);
 
@@ -119,13 +128,13 @@ test('templates versioning: create version rejects missing content with 422', fu
 
 /**
  * Prerequisites:
- * - Integration tests enabled; template uuid from helper.
+ * - A template exists for listing versions (helper).
  *
  * Steps:
- * 1. GET versions with invalid `sort` query value.
- * 2. Assert 422; non-empty `error` in JSON when present.
+ * 1. Open the version history with a bogus sort column in the query string.
+ * 2. Expect **HTTP 422**; if JSON is returned, **`error`** must not be empty.
  */
-test('templates versioning: invalid sort on versions list returns 422', function () {
+test('Templates - invalid sort on version list is rejected', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     [$apiBaseResolved, $templateUuid] = TemplatesApiHelper::createTemplateForFlow($bearer);
 
@@ -143,14 +152,14 @@ test('templates versioning: invalid sort on versions list returns 422', function
 
 /**
  * Prerequisites:
- * - Integration tests enabled; user can publish, clone, delete draft, and edit published.
+ * - Owner can publish, duplicate, remove a draft copy, and start an edit from a live template.
  *
  * Steps:
- * 1. Create and publish template A.
- * 2. POST clone → new uuid, `status` draft; DELETE the clone draft (cleanup).
- * 3. POST edit on published A → new draft uuid in response with `status` draft.
+ * 1. Create a template and publish it.
+ * 2. Duplicate it; expect a **new** id and **`data.status`** **draft**; delete that duplicate draft to clean up.
+ * 3. Start an edit from the still-published original; expect **HTTP 200** and a **new** draft id in **`data.uuid`** with **`data.status`** **draft**.
  */
-test('templates versioning: clone published template and edit published creates new draft', function () {
+test('Templates - duplicate published template and edit published yields a new draft', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     [$apiBaseResolved, $uuid] = TemplatesApiHelper::createTemplateForFlow(
         $bearer,
@@ -194,14 +203,14 @@ test('templates versioning: clone published template and edit published creates 
 
 /**
  * Prerequisites:
- * - Integration tests enabled; template lifecycle publish allowed.
+ * - Owner can publish a template.
  *
  * Steps:
- * 1. Create template and publish it.
- * 2. DELETE same uuid while published.
- * 3. Assert 422 (must not treat as success); non-empty `error` when JSON.
+ * 1. Publish a template so it is no longer a plain draft.
+ * 2. Try to delete it outright while still published.
+ * 3. Expect refusal (**HTTP 422**), not success; JSON should carry a non-empty **`error`** when present.
  */
-test('templates versioning: delete published template returns 422', function () {
+test('Templates - deleting a published template outright is not allowed', function () {
     $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     [$apiBaseResolved, $uuid] = TemplatesApiHelper::createTemplateForFlow($bearer);
 

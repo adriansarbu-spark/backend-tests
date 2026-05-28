@@ -10,20 +10,24 @@ require_once __DIR__ . '/../../../Support/DocumentsApiHelper.php';
 if (SKIP_INTEGRATION_TESTS) {
     /**
      * Prerequisites:
-     * - `SKIP_INTEGRATION_TESTS` is true in `tests_config.php` (integration suite disabled for this run).
+     * - Integration tests are turned off in `tests_config.php` (`SKIP_INTEGRATION_TESTS` is true).
      *
      * Steps:
-     * 1. Mark skipped so no database or HTTP document flow runs.
+     * 1. Mark this placeholder as skipped so no HTTP calls or database work run from this file.
      */
-    test('Skipping documents integration flow', function () {
+    test('Documents — integration tests are turned off for this run', function () {
         $this->markTestSkipped('Integration tests are disabled');
     });
     return;
 }
 
 /**
- * Lazy singleton for `DocumentsFlowManager` so this file shares one initialized flow
- * (bearers + one document UUID from `initialize()`) across tests that use `getDocumentsFlowManager()`.
+ * Shared helper: one “documents” session for the whole file (log in test users once, create one sample document).
+ *
+ * Steps (first time this runs in the process):
+ * 1. Build a flow manager for the configured test users (`DocumentsFlowManager::forConfiguredTestUsers()`).
+ * 2. Run `initialize()` so a real document exists and tokens are ready.
+ * 3. Return the same manager on later calls so tests do not repeat that setup.
  */
 function getDocumentsFlowManager(): DocumentsFlowManager
 {
@@ -40,27 +44,29 @@ function getDocumentsFlowManager(): DocumentsFlowManager
 
 /**
  * Prerequisites:
- * - Integration tests enabled (`SKIP_INTEGRATION_TESTS` false).
- * - `DocumentsFlowManager::forConfiguredTestUsers()` requirements met (e.g. `TEST_USER_1_*`, `TEST_USER_2_*`, `API_URL`).
+ * - Integration tests are enabled (`SKIP_INTEGRATION_TESTS` is false).
+ * - Test users and API base URL are set in `tests_config.php` so the flow manager can sign in and talk to the API.
  *
  * Steps:
- * 1. Resolve the shared flow manager and run `initialize()` (creates a document as user1).
- * 2. Assert the manager exposes a non-empty document UUID.
+ * 1. Ask for the shared flow manager (this triggers login and creates a sample document for the main user).
+ * 2. Read the document id the API returned.
+ * 3. Check that the id is not empty (creation really happened).
  */
-test('documents flow: add document', function () {
+test('Documents — adding a document succeeds', function () {
     $manager = getDocumentsFlowManager();
     expect($manager->getUuid())->not->toBe('');
 });
 
 /**
  * Prerequisites:
- * - Shared flow initialized: document owned by user1; UUID and API base from the manager.
+ * - The shared flow already created a document owned by the main test user.
  *
  * Steps:
- * 1. `GET /documents/{uuid}` with user1 bearer.
- * 2. Assert 200, JSON body, and `data.uuid` equals the flow UUID.
+ * 1. Open that document again using the main user’s session (same id as after creation).
+ * 2. Check that the server answers with success (HTTP 200).
+ * 3. Check that the response body includes the same document id we expect.
  */
-test('documents flow: get document as owner', function () {
+test('Documents — owner can view their document', function () {
     $manager = getDocumentsFlowManager();
     $apiBase = $manager->getApiBase();
     $uuid = $manager->getUuid();
@@ -69,18 +75,19 @@ test('documents flow: get document as owner', function () {
     [$ownerGetStatus, $ownerGetJson] = ApiAuthHelper::apiRequest('GET', $apiBase . '/' . rawurlencode($uuid), $user1Bearer);
     expect($ownerGetStatus)->toBe(200);
     expect(is_array($ownerGetJson))->toBeTrue();
-    expect((string)($ownerGetJson['data']['uuid'] ?? ''))->toBe($uuid);
+    expect(DocumentsApiHelper::documentUuidFromGetResponse($ownerGetJson, $uuid))->toBe($uuid);
 });
 
 /**
  * Prerequisites:
- * - Shared document owned by user1; user2 is a different account with a valid bearer.
+ * - A document exists that belongs only to the main test user.
+ * - A second test user exists and can sign in (different account from the owner).
  *
  * Steps:
- * 1. `GET /documents/{uuid}` with user2 bearer.
- * 2. Assert 403 (non-owner must not read the resource).
+ * 1. Ask the server for the same document id, but using the second user’s session.
+ * 2. Check that access is refused (HTTP 403 — “forbidden”, not a normal document view).
  */
-test('documents flow: get document as non-owner is forbidden', function () {
+test('Documents — someone else cannot open your document', function () {
     $manager = getDocumentsFlowManager();
     $apiBase = $manager->getApiBase();
     $uuid = $manager->getUuid();
@@ -92,14 +99,15 @@ test('documents flow: get document as non-owner is forbidden', function () {
 
 /**
  * Prerequisites:
- * - User1 bearer valid; document create succeeds (helper may skip if upload directory is not writable).
+ * - The main test user can sign in.
+ * - The server allows creating a new upload for this test (if uploads cannot be written, the helper may skip).
  *
  * Steps:
- * 1. Create a new document for user1 via `DocumentsApiHelper::createDocumentForFlow`.
- * 2. `GET /documents/{uuid}/file` as owner.
- * 3. Assert 200 and raw body starts with `%PDF`.
+ * 1. Create a fresh document with a small PDF attached for the main user.
+ * 2. Request the “download file” endpoint for that document as the owner.
+ * 3. Check that the download succeeds (HTTP 200) and the bytes look like a real PDF (starts with `%PDF`).
  */
-test('documents flow: document owner can download their PDF via /file', function () {
+test('Documents — owner can download their PDF', function () {
     $manager = getDocumentsFlowManager();
     $user1Bearer = $manager->getUser1Bearer();
 
@@ -118,14 +126,15 @@ test('documents flow: document owner can download their PDF via /file', function
 
 /**
  * Prerequisites:
- * - Two distinct test users with valid bearers (`DocumentsFlowManager` / `tests_config.php`).
+ * - Two different test accounts can sign in.
  *
  * Steps:
- * 1. Create a document owned by user2.
- * 2. Request `GET /documents/{uuid}/file` with user1 bearer (non-owner).
- * 3. Assert status is not 200; when JSON is returned, assert non-empty `error` (guideline: assert error shape on failures).
+ * 1. User B creates their own document with a PDF.
+ * 2. User A (not the owner) tries to download B’s file using the same document id.
+ * 3. Check that the download does not succeed as a normal file (not HTTP 200).
+ * 4. If the server returns JSON with error details, check that an error message is present.
  */
-test('documents flow: non-owner cannot download another account document via /file', function () {
+test('Documents — you cannot download another person’s PDF', function () {
     $manager = getDocumentsFlowManager();
     $user2Bearer = $manager->getUser2Bearer();
     $user1Bearer = $manager->getUser1Bearer();
@@ -147,31 +156,20 @@ test('documents flow: non-owner cannot download another account document via /fi
 });
 
 
-if (defined('SKIP_USER_3_FAILED_TESTS') && SKIP_USER_3_FAILED_TESTS) {
-    /**
-     * Prerequisites:
-     * - `SKIP_USER_3_FAILED_TESTS` is true — user3 uncertified upload scenarios are disabled for this run.
-     *
-     * Steps:
-     * 1. Mark skipped; the full scenario runs when the flag is false.
-     */
-    test('documents flow: uncertified account qualified upload (behavior check)', function () {
-        $this->markTestSkipped('Uncertified-account upload tests are disabled');
-    });
-    return;
-}
+
 
 /**
  * Prerequisites:
- * - Integration tests enabled; `SKIP_USER_3_FAILED_TESTS` false.
- * - `TEST_USER_3_EMAIL` / `TEST_USER_3_PASSWORD` available for `ApiAuthHelper::bearerTokenFor`.
+ * - `TEST_USER_3_EMAIL` and `TEST_USER_3_PASSWORD` in `tests_config.php` point to a real “less verified” test account.
  *
  * Steps:
- * 1. Upload a minimal PDF as QUALIFIED via `DocumentsApiHelper::uploadDocumentForFlow` as user3 (uncertified account behavior).
- * 2. Assert status is one of 200, 403, or 422 (environment/account-dependent).
- * 3. On 200: assert JSON and non-empty `data.uuid`. On non-200 with JSON: assert non-empty `error`.
+ * 1. Sign in as that third user and prepare a tiny PDF in memory.
+ * 2. Upload it as a “qualified” document through the same API the app uses.
+ * 3. Check that the HTTP status is one of: success (200), forbidden (403), or validation issue (422) — different environments may legitimately differ.
+ * 4. If the upload succeeded (200), check that the response includes a new document id.
+ * 5. If the upload did not succeed but JSON errors came back, check that at least one error message is present.
  */
-test('documents flow: uncertified account qualified upload (behavior check)', function () {
+test('Documents — uncertified account may upload or be blocked (environment-specific)', function () {
     $user3Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_3_EMAIL, TEST_USER_3_PASSWORD);
 
     $pdfContent = "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF";
