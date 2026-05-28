@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../tests_config.php';
 require_once __DIR__ . '/../../../Support/ApiAuthHelper.php';
 require_once __DIR__ . '/../../../Support/DocumentsFlowManager.php';
 require_once __DIR__ . '/../../../Support/DocumentsApiHelper.php';
+require_once __DIR__ . '/../../../Support/AccountCompaniesApiHelper.php';
 
 if (SKIP_INTEGRATION_TESTS) {
     /**
@@ -95,6 +96,154 @@ test('Documents — someone else cannot open your document', function () {
 
     [$otherGetStatus] = ApiAuthHelper::apiRequest('GET', $apiBase . '/' . rawurlencode($uuid), $user2Bearer);
     expect($otherGetStatus)->toBe(403);
+});
+
+/**
+ * Prerequisites:
+ * - TEST_USER_1 can sign in and can switch to a company representative/admin active role.
+ * - Documents API supports ownership update for DRAFT via PUT /documents/{uuid}.
+ *
+ * Steps:
+ * 1. Sign in as TEST_USER_1 with a fresh token and switch active role to company context.
+ * 2. Create a new DRAFT document.
+ * 3. Update the draft through PUT /documents/{uuid} with ownership=company.
+ * 4. Verify PUT response reports ownership=company.
+ * 5. Verify the document appears in company list and does not appear in personal list.
+ */
+test('Documents — company ownership is saved and listed under company envelopes', function () {
+    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    AccountCompaniesApiHelper::switchUser1ToCompanyRepresentativeRole($user1Bearer);
+
+    [$apiBase, $uuid] = DocumentsApiHelper::createDocumentForFlow($user1Bearer);
+
+    [$putStatus, $putJson, $putRaw] = ApiAuthHelper::apiRequest(
+        'PUT',
+        $apiBase . '/' . rawurlencode($uuid),
+        $user1Bearer,
+        [
+            'json' => [
+                'ownership' => 'company',
+            ],
+            'headers' => [
+                'Content-Type' => 'application/json',
+            ],
+        ]
+    );
+
+    expect($putStatus)->toBe(200, 'Ownership update failed. raw=' . substr((string)$putRaw, 0, 700));
+    expect(is_array($putJson))->toBeTrue('Ownership update returned non-JSON. raw=' . substr((string)$putRaw, 0, 700));
+    expect((string)($putJson['data']['ownership'] ?? ''))->toBe('company');
+
+    [$companyListStatus, $companyListJson, $companyListRaw] = ApiAuthHelper::apiRequest(
+        'GET',
+        $apiBase . '?scope=all_related&envelope_ownership=company&per_page=100',
+        $user1Bearer
+    );
+    expect($companyListStatus)->toBe(200, 'Company ownership list failed. raw=' . substr((string)$companyListRaw, 0, 700));
+    expect(is_array($companyListJson))->toBeTrue('Company ownership list returned non-JSON. raw=' . substr((string)$companyListRaw, 0, 700));
+
+    $companyRows = (array)($companyListJson['data'] ?? []);
+    $foundInCompanyList = false;
+    foreach ($companyRows as $row) {
+        if ((string)($row['uuid'] ?? '') === $uuid) {
+            $foundInCompanyList = true;
+            expect((string)($row['ownership'] ?? ''))->toBe('company');
+            break;
+        }
+    }
+    expect($foundInCompanyList)->toBeTrue('Updated document should appear in company envelope list.');
+
+    [$personalListStatus, $personalListJson, $personalListRaw] = ApiAuthHelper::apiRequest(
+        'GET',
+        $apiBase . '?scope=all_related&envelope_ownership=personal&per_page=100',
+        $user1Bearer
+    );
+    expect($personalListStatus)->toBe(200, 'Personal ownership list failed. raw=' . substr((string)$personalListRaw, 0, 700));
+    expect(is_array($personalListJson))->toBeTrue('Personal ownership list returned non-JSON. raw=' . substr((string)$personalListRaw, 0, 700));
+
+    $personalRows = (array)($personalListJson['data'] ?? []);
+    $foundInPersonalList = false;
+    foreach ($personalRows as $row) {
+        if ((string)($row['uuid'] ?? '') === $uuid) {
+            $foundInPersonalList = true;
+            break;
+        }
+    }
+    expect($foundInPersonalList)->toBeFalse('Updated company-owned document should not appear in personal envelope list.');
+});
+
+/**
+ * Prerequisites:
+ * - TEST_USER_1 can switch to company representative/admin active role.
+ * - TEST_USER_2 is a different account and not the owner of TEST_USER_1 company envelopes.
+ *
+ * Steps:
+ * 1. Sign in as TEST_USER_1, switch to company role, create a document, then set ownership=company.
+ * 2. Sign in as TEST_USER_2 and attempt direct GET /documents/{uuid}.
+ * 3. Verify access is denied (never HTTP 200).
+ * 4. Verify the same UUID is not visible in TEST_USER_2 list for both all/company ownership filters.
+ */
+test('Documents — you cannot see another company document', function () {
+    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    AccountCompaniesApiHelper::switchUser1ToCompanyRepresentativeRole($user1Bearer);
+
+    [$apiBase, $uuid] = DocumentsApiHelper::createDocumentForFlow($user1Bearer);
+
+    [$putStatus, $putJson, $putRaw] = ApiAuthHelper::apiRequest(
+        'PUT',
+        $apiBase . '/' . rawurlencode($uuid),
+        $user1Bearer,
+        [
+            'json' => ['ownership' => 'company'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]
+    );
+    expect($putStatus)->toBe(200, 'Could not switch ownership to company. raw=' . substr((string)$putRaw, 0, 700));
+    expect(is_array($putJson))->toBeTrue('Ownership update returned non-JSON. raw=' . substr((string)$putRaw, 0, 700));
+    expect((string)($putJson['data']['ownership'] ?? ''))->toBe('company');
+
+    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    [$switch2Status] = AccountCompaniesApiHelper::switchActiveRole($user2Bearer, (string)TEST_USER_2_PERSONAL_ROLE_UUID);
+    expect($switch2Status)->toBe(200);
+
+    [$otherGetStatus] = ApiAuthHelper::apiRequest(
+        'GET',
+        $apiBase . '/' . rawurlencode($uuid),
+        $user2Bearer
+    );
+    expect($otherGetStatus)->not->toBe(200, 'Another account must not be able to open company-owned document by uuid.');
+
+    [$user2AllListStatus, $user2AllListJson, $user2AllListRaw] = ApiAuthHelper::apiRequest(
+        'GET',
+        $apiBase . '?scope=all_related&envelope_ownership=all&per_page=100',
+        $user2Bearer
+    );
+    expect($user2AllListStatus)->toBe(200, 'User2 all list failed. raw=' . substr((string)$user2AllListRaw, 0, 700));
+    expect(is_array($user2AllListJson))->toBeTrue('User2 all list returned non-JSON. raw=' . substr((string)$user2AllListRaw, 0, 700));
+    $foundInUser2All = false;
+    foreach ((array)($user2AllListJson['data'] ?? []) as $row) {
+        if ((string)($row['uuid'] ?? '') === $uuid) {
+            $foundInUser2All = true;
+            break;
+        }
+    }
+    expect($foundInUser2All)->toBeFalse('Another account should not receive owner UUID for company-owned document in all list.');
+
+    [$user2CompanyListStatus, $user2CompanyListJson, $user2CompanyListRaw] = ApiAuthHelper::apiRequest(
+        'GET',
+        $apiBase . '?scope=all_related&envelope_ownership=company&per_page=100',
+        $user2Bearer
+    );
+    expect($user2CompanyListStatus)->toBe(200, 'User2 company list failed. raw=' . substr((string)$user2CompanyListRaw, 0, 700));
+    expect(is_array($user2CompanyListJson))->toBeTrue('User2 company list returned non-JSON. raw=' . substr((string)$user2CompanyListRaw, 0, 700));
+    $foundInUser2Company = false;
+    foreach ((array)($user2CompanyListJson['data'] ?? []) as $row) {
+        if ((string)($row['uuid'] ?? '') === $uuid) {
+            $foundInUser2Company = true;
+            break;
+        }
+    }
+    expect($foundInUser2Company)->toBeFalse('Another account should not see company-owned document in company list.');
 });
 
 /**
