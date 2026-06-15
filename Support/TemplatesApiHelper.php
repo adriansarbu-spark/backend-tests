@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/ApiAuthHelper.php';
+require_once __DIR__ . '/AccountCompaniesApiHelper.php';
 
 final class TemplatesApiHelper
 {
@@ -27,6 +28,14 @@ final class TemplatesApiHelper
     }
 
     /**
+     * Sign in as TEST_USER_1 with personal active role (template owner flows).
+     */
+    public static function bearerUser1(): string
+    {
+        return AccountCompaniesApiHelper::bearerForUser1Personal();
+    }
+
+    /**
      * Minimal config validation for templates integration flows.
      *
      * Mirrors the documents/signing helpers: skip when required config is missing
@@ -42,6 +51,7 @@ final class TemplatesApiHelper
             'TEST_USER_1_PASSWORD' => defined('TEST_USER_1_PASSWORD') ? TEST_USER_1_PASSWORD : '',
             'TEST_USER_2_EMAIL' => defined('TEST_USER_2_EMAIL') ? TEST_USER_2_EMAIL : '',
             'TEST_USER_2_PASSWORD' => defined('TEST_USER_2_PASSWORD') ? TEST_USER_2_PASSWORD : '',
+            'TEST_USER_1_PERSONAL_ROLE_UUID' => defined('TEST_USER_1_PERSONAL_ROLE_UUID') ? TEST_USER_1_PERSONAL_ROLE_UUID : '',
         ];
 
         foreach ($required as $key => $value) {
@@ -88,6 +98,7 @@ final class TemplatesApiHelper
         $payload = array_merge([
             'name' => $name,
             'content' => '<p>Template body</p>',
+            'language_id' => 1,
         ], $overrides);
 
         [$status, $json, $raw] = self::rawCreateTemplate($userBearer, $payload, $apiBase);

@@ -54,8 +54,7 @@ test('createLibraryVersion returns 422 when content is missing', function () {
     $this->controller->createLibraryVersion('lib-uuid');
 
     expect($this->controller->statusCode)->toBe(422);
-    $error = $this->controller->json['error'] ?? [];
-    expect($error['field'] ?? null)->toBe('content');
+    expect($this->controller->json['error'] ?? null)->toBe(['content_required']);
 });
 
 test('createLibraryVersion creates next draft version and returns payload', function () {

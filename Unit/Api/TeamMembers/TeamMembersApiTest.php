@@ -44,7 +44,7 @@ test('Team members API — unauthenticated customer returns 401 before list logi
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $inv = new TeamMembersTeamInvitationModelStub();
     [$registry, $load] = tm_registry_with_stubs(new TeamMembersCustomerStub(0, 10), $inv);
-    $c = new TestableControllerPublicAPIV1TeamMembers($registry);
+    $c = tm_make_controller($registry);
     $c->index();
 
     expect($c->checkPluginCalls)->toBe(1)
@@ -66,7 +66,7 @@ test('Team members API — authenticated user without company returns 400 compan
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $inv = new TeamMembersTeamInvitationModelStub();
     [$registry, $load] = tm_registry_with_stubs(new TeamMembersCustomerStub(1, 0), $inv);
-    $c = new TestableControllerPublicAPIV1TeamMembers($registry);
+    $c = tm_make_controller($registry);
     $c->index();
 
     expect($c->statusCode)->toBe(400)
@@ -103,7 +103,7 @@ test('Team members API — GET list forwards filters and returns data plus pagin
         'member_status'         => 'any',
         'representative_status' => 'pending',
     ];
-    $c = new TestableControllerPublicAPIV1TeamMembers($registry);
+    $c = tm_make_controller($registry);
     $c->index();
 
     expect($c->statusCode)->toBe(200)
@@ -138,7 +138,7 @@ test('Team members API — unsupported method on list route returns 405', functi
     $_SERVER['REQUEST_METHOD'] = 'PUT';
     $inv = new TeamMembersTeamInvitationModelStub();
     [$registry] = tm_registry_with_stubs(new TeamMembersCustomerStub(1, 10), $inv);
-    $c = new TestableControllerPublicAPIV1TeamMembers($registry);
+    $c = tm_make_controller($registry);
     $c->index();
 
     expect($c->statusCode)->toBe(405)
@@ -162,7 +162,7 @@ test('Team members API — terminate action with GET returns 405 before authoriz
         'members_action' => 'terminate',
         'role_uuid'      => 'deadbeef-dead-beef-dead-beefdeadbeef',
     ];
-    $c = new TestableControllerPublicAPIV1TeamMembers($registry);
+    $c = tm_make_controller($registry);
     $c->index();
 
     expect($c->statusCode)->toBe(405)
@@ -183,7 +183,7 @@ test('Team members API — terminate path from REQUEST_URI with GET returns 405'
     $_SERVER['REQUEST_URI'] = '/publicapi/v1/team/members/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/terminate';
     $inv = new TeamMembersTeamInvitationModelStub();
     [$registry, $load] = tm_registry_with_stubs(new TeamMembersCustomerStub(1, 10), $inv);
-    $c = new TestableControllerPublicAPIV1TeamMembers($registry);
+    $c = tm_make_controller($registry);
     $c->index();
 
     expect($c->statusCode)->toBe(405)
@@ -207,7 +207,7 @@ test('Team members API — terminate requires company admin role', function () {
         'members_action' => 'terminate',
         'role_uuid'      => 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
     ];
-    $c = new TestableControllerPublicAPIV1TeamMembers($registry);
+    $c = tm_make_controller($registry);
     $c->setPostPayload([]);
     $c->index();
 
@@ -231,7 +231,7 @@ test('Team members API — terminate without role_uuid returns 400', function ()
     $registry->get('request')->get = [
         'members_action' => 'terminate',
     ];
-    $c = new TestableControllerPublicAPIV1TeamMembers($registry);
+    $c = tm_make_controller($registry);
     $c->setPostPayload([]);
     $c->index();
 
@@ -257,7 +257,7 @@ test('Team members API — terminate with TOTP enrolled requires totp_code in bo
         'role_uuid' => 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
         'action'    => 'terminate',
     ];
-    $c = new TestableControllerPublicAPIV1TeamMembers($registry);
+    $c = tm_make_controller($registry);
     $c->setPostPayload(['reason' => 'left company']);
     $c->index();
 
@@ -282,7 +282,7 @@ test('Team members API — terminate maps member_not_found to 404', function () 
     $registry->get('request')->get = [
         'route' => 'publicapi/v1/team/members/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/terminate',
     ];
-    $c = new TestableControllerPublicAPIV1TeamMembers($registry);
+    $c = tm_make_controller($registry);
     $c->setPostPayload([]);
     $c->index();
 
@@ -312,7 +312,7 @@ test('Team members API — terminate maps seal_revocation_failed to 502 with sea
         'role_uuid' => 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
         'action'    => 'terminate',
     ];
-    $c = new TestableControllerPublicAPIV1TeamMembers($registry);
+    $c = tm_make_controller($registry);
     $c->setPostPayload([]);
     $c->index();
 
@@ -343,7 +343,7 @@ test('Team members API — successful terminate returns member summary and revoc
         'role_uuid' => 'u1',
         'action'    => 'terminate',
     ];
-    $c = new TestableControllerPublicAPIV1TeamMembers($registry);
+    $c = tm_make_controller($registry);
     $c->setPostPayload(['reason' => 'role change']);
     $c->index();
 

@@ -35,7 +35,7 @@ test('Team invitations API — unauthenticated customer returns 401', function (
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $model = new TeamInvitationsModelStub();
     [$registry, $load] = ti_registry_with_model(new TeamInvitationsAdminCustomerStub(0, 10, 1), $model);
-    $c = new TestableControllerPublicAPIV1TeamInvitations($registry);
+    $c = ti_make_controller($registry);
     $c->index();
 
     expect($c->checkPluginCalls)->toBe(1)
@@ -57,7 +57,7 @@ test('Team invitations API — missing company context returns 400 before listin
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $model = new TeamInvitationsModelStub();
     [$registry, $load] = ti_registry_with_model(new TeamInvitationsAdminCustomerStub(1, 0, 5), $model);
-    $c = new TestableControllerPublicAPIV1TeamInvitations($registry);
+    $c = ti_make_controller($registry);
     $c->index();
 
     expect($c->statusCode)->toBe(400)
@@ -78,12 +78,12 @@ test('Team invitations API — non-admin role cannot list invitations', function
     $model = new TeamInvitationsModelStub();
     $customer = new TeamInvitationsAdminCustomerStub(1, 10, 5, 'employee');
     [$registry, $load] = ti_registry_with_model($customer, $model);
-    $c = new TestableControllerPublicAPIV1TeamInvitations($registry);
+    $c = ti_make_controller($registry);
     $c->index();
 
     expect($c->statusCode)->toBe(403)
         ->and($c->json['error'])->toBe(['admin_role_required'])
-        ->and($load->loadedModels)->toBe([]);
+        ->and($load->loadedModels)->toBe(['account/team_invitation']);
 });
 
 /**
@@ -106,7 +106,7 @@ test('Team invitations API — GET list allows case-variant Admin role and forwa
     $customer = new TeamInvitationsAdminCustomerStub(1, 10, 5, 'Admin');
     [$registry, $load] = ti_registry_with_model($customer, $model);
     $registry->get('request')->get = ['status' => 'pending'];
-    $c = new TestableControllerPublicAPIV1TeamInvitations($registry);
+    $c = ti_make_controller($registry);
     $c->index();
 
     expect($c->statusCode)->toBe(200)
@@ -129,7 +129,7 @@ test('Team invitations API — unsupported HTTP method returns 405', function ()
     $_SERVER['REQUEST_METHOD'] = 'DELETE';
     $model = new TeamInvitationsModelStub();
     [$registry, $load] = ti_registry_with_model(new TeamInvitationsAdminCustomerStub(1, 10, 5), $model);
-    $c = new TestableControllerPublicAPIV1TeamInvitations($registry);
+    $c = ti_make_controller($registry);
     $c->index();
 
     expect($c->statusCode)->toBe(405)
@@ -151,7 +151,7 @@ test('Team invitations API — POST create rejects invalid email', function () {
     $model->validEmail = false;
     $model->createResult = ['token' => 'x', 'invitation_uuid' => 'u'];
     [$registry, $load] = ti_registry_with_model(new TeamInvitationsAdminCustomerStub(1, 10, 5), $model);
-    $c = new TestableControllerPublicAPIV1TeamInvitations($registry);
+    $c = ti_make_controller($registry);
     $c->setPostPayload(['email' => 'bad', 'role_code' => 'admin']);
     $c->index();
 
@@ -173,7 +173,7 @@ test('Team invitations API — POST create rejects disallowed role_code', functi
     $model = new TeamInvitationsModelStub();
     $model->allowedRole = false;
     [$registry] = ti_registry_with_model(new TeamInvitationsAdminCustomerStub(1, 10, 5), $model);
-    $c = new TestableControllerPublicAPIV1TeamInvitations($registry);
+    $c = ti_make_controller($registry);
     $c->setPostPayload(['email' => 'ok@example.com', 'role_code' => 'superuser']);
     $c->index();
 
@@ -194,7 +194,7 @@ test('Team invitations API — POST create fails when model returns no token', f
     $model = new TeamInvitationsModelStub();
     $model->createResult = ['invitation_uuid' => 'no-token-row'];
     [$registry] = ti_registry_with_model(new TeamInvitationsAdminCustomerStub(1, 10, 5), $model);
-    $c = new TestableControllerPublicAPIV1TeamInvitations($registry);
+    $c = ti_make_controller($registry);
     $c->setPostPayload(['email' => 'new@example.com']);
     $c->index();
 
@@ -223,7 +223,7 @@ test('Team invitations API — POST create surfaces email queue failure after pe
         'role_name'        => 'Employee',
     ];
     [$registry] = ti_registry_with_model(new TeamInvitationsAdminCustomerStub(1, 10, 5), $model);
-    $c = new TestableControllerPublicAPIV1TeamInvitations($registry);
+    $c = ti_make_controller($registry);
     $c->queueInvitationEmailResult = false;
     $c->setPostPayload(['email' => 'peer@example.com']);
     $c->index();
@@ -253,7 +253,7 @@ test('Team invitations API — POST create success strips token from response bo
         'role_code'        => 'employee',
     ];
     [$registry] = ti_registry_with_model(new TeamInvitationsAdminCustomerStub(9, 10, 5), $model);
-    $c = new TestableControllerPublicAPIV1TeamInvitations($registry);
+    $c = ti_make_controller($registry);
     $c->setPostPayload(['email' => 'joiner@example.com', 'role_code' => '']);
     $c->index();
 

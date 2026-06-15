@@ -11,7 +11,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 /**
  * Unit tests for parties (signers) and smartfields validation on createTemplate().
  *
- * @see ControllerPublicAPIV1EsignTplTemplates::createTemplate — assert code/field only, not message text.
+ * @see ControllerPublicAPIV1EsignTplTemplates::createTemplate — assert error codes only, not message text.
  */
 
 beforeEach(function () {
@@ -58,9 +58,7 @@ test('createTemplate returns 422 when parties contain duplicate signer code', fu
     $this->controller->createTemplate();
 
     expect($this->controller->statusCode)->toBe(422);
-    $error = $this->controller->json['error'] ?? [];
-    expect($error['code'] ?? null)->toBe('VALIDATION_ERROR');
-    expect($error['field'] ?? null)->toBe('parties');
+    expect($this->controller->json['error'] ?? null)->toBe(['parties_duplicate_code']);
 });
 
 test('createTemplate returns 422 when smartfield is missing type', function () {
@@ -83,7 +81,5 @@ test('createTemplate returns 422 when smartfield is missing type', function () {
     $this->controller->createTemplate();
 
     expect($this->controller->statusCode)->toBe(422);
-    $error = $this->controller->json['error'] ?? [];
-    expect($error['code'] ?? null)->toBe('VALIDATION_ERROR');
-    expect($error['field'] ?? null)->toBe('smartfields');
+    expect($this->controller->json['error'] ?? null)->toBe(['smartfields_type_required']);
 });

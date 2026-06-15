@@ -6,8 +6,6 @@ require_once __DIR__ . '/../../../tests_config.php';
 require_once PUBLIC_API . 'esign/tpl/library.php';
 require_once __DIR__ . '/_support/TemplateLibraryTestDoubles.php';
 
-use PHPUnit\Framework\MockObject\MockObject;
-
 /**
  * Unit tests for ControllerPublicAPIV1EsignTplLibrary::listLibraries()
  */
@@ -15,12 +13,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 beforeEach(function () {
     $registry = new Registry();
 
-    /** @var TestableControllerPublicAPIV1EsignTplLibrary&MockObject $controller */
-    $this->controller = $this->getMockBuilder(TestableControllerPublicAPIV1EsignTplLibrary::class)
-        ->setConstructorArgs([$registry])
-        ->onlyMethods(['sendResponse'])
-        ->getMock();
-
+    $this->controller = new TestableControllerPublicAPIV1EsignTplLibrary($registry);
     $this->controller->json = [];
     $this->controller->statusCode = null;
 
@@ -45,9 +38,6 @@ test('listLibraries filters status to published for non-simplifi.ro emails', fun
     $this->controller->request->get = [
         'status' => 'draft',
     ];
-
-    // Make isSimplifiRoEmail() return false via a simple subclass override in the test double.
-    $this->controller->method('sendResponse')->willReturn(null);
 
     $model = new class {
         public array $seenParams = [];
@@ -78,29 +68,30 @@ test('listLibraries returns libraries and pagination metadata and can_archive on
         'status' => 'published',
     ];
 
-    $this->controller->method('sendResponse')->willReturn(null);
-
     $this->controller->model_esign_tpl_library = new class {
         public function listLibraries(array $params) {
             return [
-                [
-                    'uuid' => 'lib-1',
-                    'name' => 'Lib 1',
-                    'description' => 'D1',
-                    'category_code' => 'general',
-                    'language_id' => 1,
-                    'status' => 'published',
-                    'version' => 1,
-                    'parties_count' => 2,
-                    'smartfields_count' => 3,
-                    'date_added' => '2024-01-01 10:00:00',
-                    'date_modified' => '2024-01-02 10:00:00',
+                'libraries' => [
+                    [
+                        'uuid' => 'lib-1',
+                        'name' => 'Lib 1',
+                        'description' => 'D1',
+                        'category_code' => 'general',
+                        'language_id' => 1,
+                        'status' => 'published',
+                        'version' => 1,
+                        'parties_count' => 2,
+                        'smartfields_count' => 3,
+                        'date_added' => '2024-01-01 10:00:00',
+                        'date_modified' => '2024-01-02 10:00:00',
+                    ],
+                    [
+                        'uuid' => 'lib-2',
+                        'name' => 'Lib 2',
+                        'status' => 'draft',
+                    ],
                 ],
-                [
-                    'uuid' => 'lib-2',
-                    'name' => 'Lib 2',
-                    'status' => 'draft',
-                ],
+                'total' => 2,
             ];
         }
     };

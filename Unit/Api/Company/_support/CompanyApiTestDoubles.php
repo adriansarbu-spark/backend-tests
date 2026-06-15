@@ -9,6 +9,36 @@ if (! defined('PUBLIC_API')) {
 require_once PUBLIC_API . 'company/representatives.php';
 require_once PUBLIC_API . 'company/representative_requests.php';
 
+if (! class_exists(ModelCompanyRepresentative::class, false)) {
+    /** Minimal stub for static helpers used by representative-requests controller unit tests. */
+    class ModelCompanyRepresentative
+    {
+        public const REQUEST_PENDING = 'pending';
+        public const REQUEST_APPROVED = 'approved';
+        public const REQUEST_REJECTED = 'rejected';
+        public const REQUEST_CANCELLED = 'cancelled';
+
+        public static function normalizeRequestListStatusFilter($status)
+        {
+            if ($status === null || trim((string) $status) === '') {
+                return null;
+            }
+            $status = strtolower(trim((string) $status));
+            if ($status === 'in_review') {
+                return self::REQUEST_PENDING;
+            }
+            $allowed = [
+                self::REQUEST_PENDING,
+                self::REQUEST_APPROVED,
+                self::REQUEST_REJECTED,
+                self::REQUEST_CANCELLED,
+            ];
+
+            return in_array($status, $allowed, true) ? $status : false;
+        }
+    }
+}
+
 if (! class_exists(ModelLegalDocument::class, false)) {
     /** Minimal stub so {@see LegalDocumentAcceptance} can validate UUIDs without DB models. */
     class ModelLegalDocument

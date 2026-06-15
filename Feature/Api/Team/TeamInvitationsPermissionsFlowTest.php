@@ -97,7 +97,7 @@ test('Team invitations - outsider cannot revoke another company’s invitation b
     [$list2St, $list2Json, $list2Raw] = TeamApiHelper::get(TeamApiHelper::invitationsUrl() . '?per_page=1', $bearer2);
     if ($list2St === 403) {
         // User2 is not company admin — still must not revoke user1’s invite (exercise POST revoke path).
-        expect(TeamApiHelper::joinedErrors($list2Json))->toContain('admin_role_required');
+        expect(TeamApiHelper::joinedErrors($list2Json))->toMatch('/admin_role_required|access_denied/');
     } elseif ($list2St === 400 && TeamApiHelper::isCompanyMembershipRequiredError($list2Json)) {
         // No active company / wrong membership — cannot list invitations for a tenant.
         expect(TeamApiHelper::joinedErrors($list2Json))->not->toBe('');

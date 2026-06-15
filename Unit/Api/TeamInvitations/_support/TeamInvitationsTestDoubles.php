@@ -138,6 +138,11 @@ final class TeamInvitationsModelStub
         return $this->allowedRole;
     }
 
+    public function isAdminInviteRoleCode(string $roleCode): bool
+    {
+        return mb_strtolower(trim($roleCode)) === 'admin';
+    }
+
     public function createOrRefreshPendingInvitation(
         int $companyId,
         int $inviterCustomerId,
@@ -183,10 +188,40 @@ function ti_registry_with_model(object $customer, TeamInvitationsModelStub $mode
     $load = new TeamInvitationsLoadStub($registry, $model);
     $registry->set('load', $load);
     $registry->set('customer', $customer);
+    $registry->set('config', new class {
+        public function load(string $key): void
+        {
+        }
+
+        public function get(string $key): mixed
+        {
+            return match ($key) {
+                'team_invitation_send_limit_per_company_recipient' => 100,
+                'team_invitation_send_window_secs' => 3600,
+                'team_invitation_resend_min_interval_secs' => 0,
+                'config_language_id' => 1,
+                default => null,
+            };
+        }
+    });
     $registry->set('request', (object) [
         'get'    => [],
         'server' => [],
     ]);
 
     return [$registry, $load];
+}
+
+/**
+ * Team invitations controller with route permissions granted (Dimension 3 gate).
+ */
+function ti_make_controller(Registry $registry): TestableControllerPublicAPIV1TeamInvitations
+{
+    $controller = new TestableControllerPublicAPIV1TeamInvitations($registry);
+    $controller->permission = (object) [
+        'get'  => ['publicapi/v1/team/invitations'],
+        'post' => ['publicapi/v1/team/invitations'],
+    ];
+
+    return $controller;
 }

@@ -146,7 +146,7 @@ final class TeamApiHelper
         if ($status === 404 && str_contains($e, 'invitation_not_found')) {
             return true;
         }
-        if ($status === 403 && str_contains($e, 'admin_role_required')) {
+        if ($status === 403 && (str_contains($e, 'admin_role_required') || str_contains($e, 'access_denied'))) {
             return true;
         }
         if ($status === 400 && self::isCompanyMembershipRequiredError($json)) {

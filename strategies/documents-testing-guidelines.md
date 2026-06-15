@@ -48,7 +48,8 @@ If a file uses a lazy singleton or “run once” setup (e.g. `getDocumentsFlowM
 1. Reuse existing helpers for auth and API calls:
    - `ApiAuthHelper::bearerTokenFor(...)`
    - `ApiAuthHelper::apiRequest(...)`
-2. Reuse flow helpers for multi-step signing/document flows:
+2. **Integration baseline role:** before each Feature test, `tests/Pest.php` resets **`TEST_USER_1`** and **`TEST_USER_2`** to their **personal** roles via `POST /account/active-role` (`AccountCompaniesApiHelper::ensureIntegrationUsersPersonalActiveRoles`). Set `TEST_USER_1_PERSONAL_ROLE_UUID` / `TEST_USER_2_PERSONAL_ROLE_UUID` in `tests_config.php`. Scenarios that need a company admin or representative role must switch explicitly afterward (e.g. `TeamApiHelper::bearerWithActiveCompanyAdminRole`, `AccountCompaniesApiHelper::switchUser1ToCompanyRepresentativeRole`).
+3. Reuse flow helpers for multi-step signing/document flows:
    - `SigningFlowHelper`
    - `DocumentsFlowManager`
    - `DocumentsApiHelper`
@@ -167,6 +168,7 @@ Use **Prerequisites** and **Steps** so expectations and setup are obvious:
 /**
  * Prerequisites:
  * - Integration tests enabled (or skip branch documented) and any helper guards satisfied (e.g. `beforeAll` / `assertRequiredConfigOrSkip`).
+ * - Personal active role for owner flows: `TEST_USER_1_PERSONAL_ROLE_UUID` in `tests_config.php` (Feature tests reset via `beforeEach` in `tests/Pest.php`; or call `AccountCompaniesApiHelper::bearerForUser1Personal()` / `TemplatesApiHelper::bearerUser1()` in the test).
  * - Accounts or env vars this scenario depends on (e.g. `TEST_USER_1_*`, bearer + TOTP).
  *
  * Steps:

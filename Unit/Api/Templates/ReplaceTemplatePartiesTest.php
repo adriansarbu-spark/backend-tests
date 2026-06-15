@@ -128,8 +128,7 @@ test('replaceParties returns validation error when parties JSON is invalid', fun
     $this->controller->replaceParties('t1', 'v1');
 
     expect($this->controller->statusCode)->toBe(422);
-    $error = $this->controller->json['error'] ?? [];
-    expect($error['field'] ?? null)->toBe('parties');
+    expect($this->controller->json['error'] ?? null)->toBe(['parties_invalid_json']);
 });
 
 test('replaceParties succeeds for draft version and parses parties correctly', function () {

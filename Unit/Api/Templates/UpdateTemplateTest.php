@@ -104,9 +104,7 @@ test('updateTemplate returns 422 for invalid category_code', function () {
     invokeTplUpdateTemplate($this->controller, 'uuid-1');
 
     expect($this->controller->statusCode)->toBe(422);
-    $error = $this->controller->json['error'] ?? [];
-    expect($error['code'] ?? null)->toBe('VALIDATION_ERROR');
-    expect($error['field'] ?? null)->toBe('category_code');
+    expect($this->controller->json['error'] ?? null)->toBe(['invalid_category_code']);
 });
 
 test('updateTemplate succeeds when updating name and content', function () {

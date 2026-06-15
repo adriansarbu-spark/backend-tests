@@ -52,10 +52,7 @@ final class SigningFlowHelper
      */
     public static function bearerForUser1(): string
     {
-        $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-        self::switchToPersonalRole($bearer, (string)TEST_USER_1_PERSONAL_ROLE_UUID, 'TEST_USER_1');
-
-        return $bearer;
+        return AccountCompaniesApiHelper::bearerForUser1Personal();
     }
 
     /**
@@ -63,27 +60,7 @@ final class SigningFlowHelper
      */
     public static function bearerForUser2(): string
     {
-        $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
-        self::switchToPersonalRole($bearer, (string)TEST_USER_2_PERSONAL_ROLE_UUID, 'TEST_USER_2');
-
-        return $bearer;
-    }
-
-    private static function switchToPersonalRole(string $bearer, string $roleUuid, string $label): void
-    {
-        $roleUuid = trim($roleUuid);
-        if ($roleUuid === '') {
-            test()->markTestSkipped("Missing personal role_uuid for {$label}.");
-        }
-
-        [$status, $json, $raw] = AccountCompaniesApiHelper::switchActiveRole($bearer, $roleUuid);
-        if ($status !== 200) {
-            test()->markTestSkipped(
-                "POST account/active-role failed for {$label} personal role (status={$status}, errors="
-                . AccountCompaniesApiHelper::joinedErrors($json)
-                . ', raw=' . substr((string)$raw, 0, 400) . ').'
-            );
-        }
+        return AccountCompaniesApiHelper::bearerForUser2Personal();
     }
 
     public static function fixturePdfContent(): string

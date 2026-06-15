@@ -41,8 +41,7 @@ test('createLibrary returns 422 when name is missing', function () {
     $this->controller->createLibrary();
 
     expect($this->controller->statusCode)->toBe(422);
-    $error = $this->controller->json['error'] ?? [];
-    expect($error['field'] ?? null)->toBe('name');
+    expect($this->controller->json['error'] ?? null)->toBe(['name_required']);
 }
 );
 
@@ -58,8 +57,7 @@ test('createLibrary returns 422 when language_id is missing', function () {
     $this->controller->createLibrary();
 
     expect($this->controller->statusCode)->toBe(422);
-    $error = $this->controller->json['error'] ?? [];
-    expect($error['field'] ?? null)->toBe('language_id');
+    expect($this->controller->json['error'] ?? null)->toBe(['language_id_required']);
 }
 );
 

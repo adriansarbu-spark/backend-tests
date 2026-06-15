@@ -197,6 +197,8 @@ if (!class_exists(TestCustomer::class)) {
         public function getTotpSecret() {}
         public function getId() {}
         public function getCompanyId() {}
+        public function getFirstName() { return 'Signer'; }
+        public function getLastName() { return 'Test'; }
     }
 }
 

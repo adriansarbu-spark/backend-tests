@@ -65,7 +65,7 @@ test('Team invitations - POST rejects disallowed role_code', function () {
     $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
     [$status, $json, $raw] = TeamApiHelper::postJson(TeamApiHelper::invitationsUrl(), $bearer, [
         'email' => 'valid-role-test+' . gmdate('YmdHis') . '@example.com',
-        'role_code' => 'admin',
+        'role_code' => 'superuser',
     ]);
     $debug = 'status=' . $status . ' raw=' . substr($raw, 0, 600);
 

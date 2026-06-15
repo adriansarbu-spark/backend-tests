@@ -23,6 +23,20 @@ function tm_registry_with_stubs(
     return [$registry, $load];
 }
 
+/**
+ * Team members controller with route permissions granted (Dimension 3 gate).
+ */
+function tm_make_controller(Registry $registry): TestableControllerPublicAPIV1TeamMembers
+{
+    $controller = new TestableControllerPublicAPIV1TeamMembers($registry);
+    $controller->permission = (object) [
+        'get'  => ['publicapi/v1/team/members'],
+        'post' => ['publicapi/v1/team/members'],
+    ];
+
+    return $controller;
+}
+
 final class TeamMembersLoadStub
 {
     /** @var list<string> */

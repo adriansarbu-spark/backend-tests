@@ -52,9 +52,7 @@ test('createTemplate returns 422 when name is missing', function () {
     $this->controller->createTemplate();
 
     expect($this->controller->statusCode)->toBe(422);
-    $error = $this->controller->json['error'] ?? [];
-    expect($error['code'] ?? null)->toBe('VALIDATION_ERROR');
-    expect($error['field'] ?? null)->toBe('name');
+    expect($this->controller->json['error'] ?? null)->toBe(['name_required']);
 });
 
 test('createTemplate returns 422 when content is missing', function () {
@@ -69,9 +67,25 @@ test('createTemplate returns 422 when content is missing', function () {
     $this->controller->createTemplate();
 
     expect($this->controller->statusCode)->toBe(422);
-    $error = $this->controller->json['error'] ?? [];
-    expect($error['code'] ?? null)->toBe('VALIDATION_ERROR');
-    expect($error['field'] ?? null)->toBe('content');
+    expect($this->controller->json['error'] ?? null)->toBe(['content_required']);
+});
+
+test('createTemplate returns 422 when language_id is missing', function () {
+    $this->controller
+        ->method('getPost')
+        ->willReturn([
+            'name'    => 'My template',
+            'content' => 'body',
+        ]);
+
+    $this->controller->model_esign_tpl_template = new class {
+        public function createTemplate(array $data) { throw new RuntimeException('should not be called'); }
+    };
+
+    $this->controller->createTemplate();
+
+    expect($this->controller->statusCode)->toBe(422);
+    expect($this->controller->json['error'] ?? null)->toBe(['language_id_required']);
 });
 
 test('createTemplate returns 422 for invalid category_code', function () {
@@ -80,6 +94,7 @@ test('createTemplate returns 422 for invalid category_code', function () {
         ->willReturn([
             'name'          => 'My template',
             'content'       => 'body',
+            'language_id'   => 1,
             'category_code' => 'invalid',
         ]);
 
@@ -90,9 +105,7 @@ test('createTemplate returns 422 for invalid category_code', function () {
     $this->controller->createTemplate();
 
     expect($this->controller->statusCode)->toBe(422);
-    $error = $this->controller->json['error'] ?? [];
-    expect($error['code'] ?? null)->toBe('VALIDATION_ERROR');
-    expect($error['field'] ?? null)->toBe('category_code');
+    expect($this->controller->json['error'] ?? null)->toBe(['invalid_category_code']);
 });
 
 test('createTemplate returns 403 when company or role context is missing', function () {
@@ -123,8 +136,9 @@ test('createTemplate succeeds with minimal valid payload', function () {
     $this->controller
         ->method('getPost')
         ->willReturn([
-            'name'    => 'My template',
-            'content' => 'body',
+            'name'        => 'My template',
+            'content'     => 'body',
+            'language_id' => 1,
         ]);
 
     $this->controller->model_esign_tpl_template = new class {
@@ -139,4 +153,3 @@ test('createTemplate succeeds with minimal valid payload', function () {
     $data = $this->controller->json['data'] ?? [];
     expect($data['uuid'] ?? null)->not->toBeNull();
 });
-

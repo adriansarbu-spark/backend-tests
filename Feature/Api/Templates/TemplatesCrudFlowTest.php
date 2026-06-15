@@ -53,6 +53,7 @@ test('Templates - owner can create a template and see it in their list', functio
         [
             'name' => $templateName,
             'content' => '<p>Body</p>',
+            'language_id' => 1,
             'category_code' => 'contracts',
             'visibility' => 'private',
         ],
@@ -159,6 +160,7 @@ test('Templates - bad create payloads return validation errors', function () {
         [
             'name' => 'Bad category',
             'content' => '<p>Body</p>',
+            'language_id' => 1,
             'category_code' => 'invalid-category',
         ],
         $apiBase
@@ -179,6 +181,7 @@ test('Templates - bad create payloads return validation errors', function () {
         [
             'name' => 'Bad parties',
             'content' => '<p>Body</p>',
+            'language_id' => 1,
             'parties' => 'not-an-array',
         ],
         $apiBase
@@ -198,6 +201,7 @@ test('Templates - bad create payloads return validation errors', function () {
         [
             'name' => 'Bad smartfields',
             'content' => '<p>Body</p>',
+            'language_id' => 1,
             'smartfields' => 'not-an-array',
         ],
         $apiBase

@@ -13,6 +13,19 @@
 
 // pest()->extend(Tests\TestCase::class)->in('Feature');
 
+require_once __DIR__ . '/tests_config.php';
+require_once __DIR__ . '/Support/AccountCompaniesApiHelper.php';
+
+uses()
+    ->beforeEach(function () {
+        if (defined('SKIP_INTEGRATION_TESTS') && SKIP_INTEGRATION_TESTS) {
+            return;
+        }
+
+        AccountCompaniesApiHelper::ensureIntegrationUsersPersonalActiveRoles();
+    })
+    ->in('Feature');
+
 /*
 |--------------------------------------------------------------------------
 | Expectations

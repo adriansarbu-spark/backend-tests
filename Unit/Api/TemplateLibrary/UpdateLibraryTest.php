@@ -73,9 +73,7 @@ test('updateLibrary validates category_code and returns 422 on invalid value', f
     $this->controller->updateLibrary('lib-uuid');
 
     expect($this->controller->statusCode)->toBe(422);
-    $error = $this->controller->json['error'] ?? [];
-    expect($error['code'] ?? null)->toBe('VALIDATION_ERROR');
-    expect($error['field'] ?? null)->toBe('category_code');
+    expect($this->controller->json['error'] ?? null)->toBe(['invalid_category_code']);
 });
 
 test('updateLibrary updates fields and parties/smartfields on happy path', function () {

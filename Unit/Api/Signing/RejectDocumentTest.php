@@ -12,6 +12,21 @@ use RobThree\Auth\TwoFactorAuth;
 
 beforeEach(function () {
     $registry = new Registry();
+    $registry->set('db', new class {
+        public function query(string $sql): object
+        {
+            return new class {
+                public int $num_rows = 0;
+                public array $row = [];
+            };
+        }
+    });
+    $registry->set('config', new class {
+        public function get(string $key): mixed
+        {
+            return $key === 'config_language_id' ? 1 : null;
+        }
+    });
 
     /** @var TestableControllerPublicAPIV1SigningReject&MockObject $controller */
     $this->controller = $this->getMockBuilder(TestableControllerPublicAPIV1SigningReject::class)

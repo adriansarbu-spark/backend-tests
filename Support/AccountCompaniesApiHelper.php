@@ -263,4 +263,76 @@ final class AccountCompaniesApiHelper
             );
         }
     }
+
+    /**
+     * Switch persisted active role to the user's personal company role (integration baseline).
+     */
+    public static function switchTestUserToPersonalRole(string $bearer, string $roleUuid, string $label): void
+    {
+        $roleUuid = trim($roleUuid);
+        if ($roleUuid === '') {
+            test()->markTestSkipped("Missing personal role_uuid for {$label}.");
+        }
+
+        [$status, $json, $raw] = self::switchActiveRole($bearer, $roleUuid);
+        if ($status !== 200) {
+            test()->markTestSkipped(
+                "POST account/active-role failed for {$label} personal role (status={$status}, errors="
+                . self::joinedErrors($json)
+                . ', raw=' . substr((string)$raw, 0, 400) . ').'
+            );
+        }
+    }
+
+    /**
+     * Sign in as TEST_USER_1 and POST /account/active-role with TEST_USER_1_PERSONAL_ROLE_UUID.
+     */
+    public static function bearerForUser1Personal(): string
+    {
+        $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+        self::switchTestUserToPersonalRole($bearer, (string)TEST_USER_1_PERSONAL_ROLE_UUID, 'TEST_USER_1');
+
+        return $bearer;
+    }
+
+    /**
+     * Sign in as TEST_USER_2 and POST /account/active-role with TEST_USER_2_PERSONAL_ROLE_UUID.
+     */
+    public static function bearerForUser2Personal(): string
+    {
+        $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+        self::switchTestUserToPersonalRole($bearer, (string)TEST_USER_2_PERSONAL_ROLE_UUID, 'TEST_USER_2');
+
+        return $bearer;
+    }
+
+    /**
+     * Reset TEST_USER_1 session to personal role before each integration scenario.
+     */
+    public static function ensureTestUser1PersonalActiveRole(): void
+    {
+        if (!defined('TEST_USER_1_EMAIL') || !defined('TEST_USER_1_PASSWORD') || !defined('TEST_USER_1_PERSONAL_ROLE_UUID')) {
+            return;
+        }
+
+        self::bearerForUser1Personal();
+    }
+
+    /**
+     * Reset TEST_USER_1 and TEST_USER_2 sessions to personal roles before integration scenarios.
+     */
+    public static function ensureIntegrationUsersPersonalActiveRoles(): void
+    {
+        self::ensureTestUser1PersonalActiveRole();
+
+        if (!defined('TEST_USER_2_EMAIL') || !defined('TEST_USER_2_PASSWORD') || !defined('TEST_USER_2_PERSONAL_ROLE_UUID')) {
+            return;
+        }
+
+        if (!is_string(TEST_USER_2_EMAIL) || trim(TEST_USER_2_EMAIL) === '') {
+            return;
+        }
+
+        self::bearerForUser2Personal();
+    }
 }

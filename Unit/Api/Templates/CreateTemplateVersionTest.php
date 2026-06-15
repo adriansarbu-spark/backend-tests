@@ -86,8 +86,7 @@ test('createVersion returns 422 when content is missing', function () {
     invokeTplCreateVersion($this->controller, 'uuid-1');
 
     expect($this->controller->statusCode)->toBe(422);
-    $error = $this->controller->json['error'] ?? [];
-    expect($error['field'] ?? null)->toBe('content');
+    expect($this->controller->json['error'] ?? null)->toBe(['content_required']);
 }
 );
 

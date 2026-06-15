@@ -70,6 +70,7 @@ test('Templates - parties and smartfields round-trip on create, update, and read
         [
             'name' => $name,
             'content' => '<p>Contract body</p>',
+            'language_id' => 1,
             'category_code' => 'contracts',
             'visibility' => 'private',
             'parties' => $partiesCreate,
