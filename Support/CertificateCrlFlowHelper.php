@@ -5,7 +5,6 @@ declare(strict_types=1);
 require_once __DIR__ . '/ApiAuthHelper.php';
 require_once DIR_SYSTEM . 'library/samX509.php';
 
-use GuzzleHttp\Client;
 use phpseclib3\Math\BigInteger;
 use samx509\SamX509;
 
@@ -1091,20 +1090,17 @@ final class CertificateCrlFlowHelper
     private static function downloadPkixResource(string $url, string $resourceLabel = 'resource'): array
     {
         $timeoutSec = defined('CRL_DOWNLOAD_TIMEOUT_SEC') ? (int)CRL_DOWNLOAD_TIMEOUT_SEC : 10;
-        $client = new Client([
-            'http_errors' => false,
-            'timeout' => max(1, $timeoutSec),
-            'allow_redirects' => true,
-        ]);
-
         $requestUrl = self::appendCacheBustingQueryParam($url);
 
         try {
-            $response = $client->request('GET', $requestUrl, [
+            $response = ApiAuthHelper::guzzleRequest('GET', $requestUrl, [
                 'headers' => [
                     'Cache-Control' => 'no-cache, no-store',
                     'Pragma' => 'no-cache',
                 ],
+            ], [
+                'timeout' => max(1, $timeoutSec),
+                'allow_redirects' => true,
             ]);
         } catch (Throwable $e) {
             return [

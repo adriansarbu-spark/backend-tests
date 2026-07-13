@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use GuzzleHttp\Client;
-
 require_once __DIR__ . '/ApiAuthHelper.php';
 require_once __DIR__ . '/AccountCompaniesApiHelper.php';
 
@@ -140,11 +138,7 @@ final class CompanyRepresentativeApiHelper
      */
     public static function requestWithoutAuth(string $method, string $url): array
     {
-        $client = new Client([
-            'http_errors' => false,
-            'timeout' => 30,
-        ]);
-        $response = $client->request($method, $url, [
+        $response = ApiAuthHelper::guzzleRequest($method, $url, [
             'headers' => [
                 'Accept' => 'application/json',
                 'x-backend-authenticator' => 'keycloak',
@@ -210,11 +204,6 @@ final class CompanyRepresentativeApiHelper
             throw new InvalidArgumentException('Could not open PDF: ' . $absolutePdfPath);
         }
 
-        $client = new Client([
-            'http_errors' => false,
-            'timeout' => 90,
-        ]);
-
         $multipart = [
             ['name' => 'candidate_role_uuid', 'contents' => $candidateRoleUuid],
             ['name' => 'title', 'contents' => $title],
@@ -228,14 +217,14 @@ final class CompanyRepresentativeApiHelper
         ];
 
         try {
-            $response = $client->request('POST', self::representativeRequestsUrl(), [
+            $response = ApiAuthHelper::guzzleRequest('POST', self::representativeRequestsUrl(), [
                 'headers' => [
                     'Accept' => 'application/json',
                     'Authorization' => $bearer,
                     'x-backend-authenticator' => 'keycloak',
                 ],
                 'multipart' => $multipart,
-            ]);
+            ], ['timeout' => 90]);
         } finally {
             if (is_resource($handle)) {
                 fclose($handle);

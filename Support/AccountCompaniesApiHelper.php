@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use GuzzleHttp\Client;
-
 require_once __DIR__ . '/ApiAuthHelper.php';
 
 /**
@@ -83,12 +81,7 @@ final class AccountCompaniesApiHelper
      */
     public static function requestWithoutAuth(string $method): array
     {
-        $client = new Client([
-            'http_errors' => false,
-            'timeout' => 30,
-        ]);
-
-        $response = $client->request($method, self::url(), [
+        $response = ApiAuthHelper::guzzleRequest($method, self::url(), [
             'headers' => [
                 'Accept' => 'application/json',
                 'x-backend-authenticator' => 'keycloak',

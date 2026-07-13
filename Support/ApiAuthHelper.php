@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\MultipartStream;
+use GuzzleHttp\Utils as GuzzleUtils;
+use Psr\Http\Message\ResponseInterface;
 
 final class ApiAuthHelper
 {
@@ -64,12 +67,7 @@ final class ApiAuthHelper
      */
     public static function bearerTokenFor(string $username, string $password): string
     {
-        $client = new Client([
-            'http_errors' => false,
-            'timeout' => 20,
-        ]);
-
-        $response = $client->request('POST', AUTH_URL, [
+        $response = self::guzzleRequest('POST', AUTH_URL, [
             'headers' => [
                 'Accept' => 'application/json',
                 'Content-Type' => 'application/x-www-form-urlencoded',
@@ -82,7 +80,7 @@ final class ApiAuthHelper
                 'password' => $password,
                 'scope' => 'openid profile email',
             ],
-        ]);
+        ], ['timeout' => 20]);
 
         $status = (int)$response->getStatusCode();
         $body = (string)$response->getBody();
@@ -107,18 +105,13 @@ final class ApiAuthHelper
      */
     public static function apiRequest(string $method, string $url, string $bearer, array $options = []): array
     {
-        $client = new Client([
-            'http_errors' => false,
-            'timeout' => 30,
-        ]);
-
         $headers = $options['headers'] ?? [];
         $headers['Accept'] = 'application/json';
         $headers['Authorization'] = $bearer;
         $headers['x-backend-authenticator'] = 'keycloak';
         $options['headers'] = $headers;
 
-        $response = $client->request($method, $url, $options);
+        $response = self::guzzleRequest($method, $url, $options);
         $status = (int)$response->getStatusCode();
         $body = (string)$response->getBody();
         $json = json_decode($body, true);
@@ -134,6 +127,98 @@ final class ApiAuthHelper
         }
 
         return [$status, $json, $body];
+    }
+
+    /**
+     * Guzzle 7.10 + psr7 2.11 sets Content-Length as int in PrepareBodyMiddleware.
+     * Pre-setting Content-Length as a string avoids the psr7 3.0 deprecation warning.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    public static function normalizeGuzzleRequestOptions(array $options): array
+    {
+        $headers = $options['headers'] ?? [];
+        if (!is_array($headers)) {
+            $headers = [];
+        }
+
+        if (isset($options['form_params']) && is_array($options['form_params'])) {
+            $body = http_build_query($options['form_params'], '', '&', PHP_QUERY_RFC3986);
+            $options['body'] = $body;
+            unset($options['form_params']);
+
+            if (!self::hasHeader($headers, 'Content-Type')) {
+                $headers['Content-Type'] = 'application/x-www-form-urlencoded';
+            }
+            if (!self::hasHeader($headers, 'Content-Length')) {
+                $headers['Content-Length'] = (string) strlen($body);
+            }
+        }
+
+        if (array_key_exists('json', $options)) {
+            $body = GuzzleUtils::jsonEncode($options['json']);
+            $options['body'] = $body;
+            unset($options['json']);
+
+            if (!self::hasHeader($headers, 'Content-Type')) {
+                $headers['Content-Type'] = 'application/json';
+            }
+            if (!self::hasHeader($headers, 'Content-Length')) {
+                $headers['Content-Length'] = (string) strlen($body);
+            }
+        }
+
+        if (isset($options['multipart']) && is_array($options['multipart'])) {
+            $stream = new MultipartStream($options['multipart']);
+            $options['body'] = $stream;
+            unset($options['multipart']);
+
+            $size = $stream->getSize();
+            if ($size !== null && !self::hasHeader($headers, 'Content-Length')) {
+                $headers['Content-Length'] = (string) $size;
+            }
+        }
+
+        $options['headers'] = $headers;
+
+        return $options;
+    }
+
+    /**
+     * Low-level Guzzle request for integration test helpers.
+     *
+     * @param array<string, mixed> $options
+     * @param array<string, mixed> $clientConfig
+     */
+    public static function guzzleRequest(
+        string $method,
+        string $url,
+        array $options = [],
+        array $clientConfig = []
+    ): ResponseInterface {
+        $client = new Client(array_merge([
+            'http_errors' => false,
+            'timeout' => 30,
+        ], $clientConfig));
+
+        return $client->request($method, $url, self::normalizeGuzzleRequestOptions($options));
+    }
+
+    /**
+     * @param array<string, mixed> $headers
+     */
+    private static function hasHeader(array $headers, string $name): bool
+    {
+        $needle = strtolower($name);
+        foreach ($headers as $key => $_) {
+            if (strtolower((string) $key) === $needle) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
