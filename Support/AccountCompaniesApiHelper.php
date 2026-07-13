@@ -259,7 +259,7 @@ final class AccountCompaniesApiHelper
         if ($status !== 200) {
             test()->markTestSkipped(
                 'POST account/active-role failed for Company Representative context (status=' . $status
-                . ', errors=' . self::joinedErrors($json) . ', raw=' . substr($raw, 0, 400) . ').'
+                . ', errors=' . self::joinedErrors($json) . ', raw=' . ApiAuthHelper::sanitizeRawForTestMessage($raw) . ').'
             );
         }
     }
@@ -279,7 +279,7 @@ final class AccountCompaniesApiHelper
             test()->markTestSkipped(
                 "POST account/active-role failed for {$label} personal role (status={$status}, errors="
                 . self::joinedErrors($json)
-                . ', raw=' . substr((string)$raw, 0, 400) . ').'
+                . ', raw=' . ApiAuthHelper::sanitizeRawForTestMessage((string)$raw) . ').'
             );
         }
     }

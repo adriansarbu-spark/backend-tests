@@ -135,5 +135,26 @@ final class ApiAuthHelper
 
         return [$status, $json, $body];
     }
+
+    /**
+     * Make raw HTTP bodies safe for Pest/Collision console output.
+     *
+     * HTML fragments (e.g. Font Awesome icons in 404 pages) break Termwind styling
+     * when included in skip/warning messages.
+     */
+    public static function sanitizeRawForTestMessage(string $raw, int $maxLength = 400): string
+    {
+        $text = trim((string)preg_replace('/\s+/u', ' ', strip_tags($raw)));
+
+        if ($text === '') {
+            return '(empty)';
+        }
+
+        if (strlen($text) <= $maxLength) {
+            return $text;
+        }
+
+        return substr($text, 0, $maxLength) . '...';
+    }
 }
 

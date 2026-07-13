@@ -22,9 +22,14 @@ uses()
             return;
         }
 
+        $testClass = get_class($this);
+        if (str_contains($testClass, 'AccountCertificatesCrl')) {
+            return;
+        }
+
         AccountCompaniesApiHelper::ensureIntegrationUsersPersonalActiveRoles();
     })
-    ->in('Feature');
+    ->in('Feature/Api');
 
 /*
 |--------------------------------------------------------------------------
