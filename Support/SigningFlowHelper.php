@@ -15,26 +15,25 @@ final class SigningFlowHelper
      */
     public static function assertRequiredConfigOrSkip(): void
     {
-        $required = [
-            'AUTH_URL' => defined('AUTH_URL') ? AUTH_URL : '',
-            'CLIENT_ID' => defined('CLIENT_ID') ? CLIENT_ID : '',
-            'CLIENT_SECRET' => defined('CLIENT_SECRET') ? CLIENT_SECRET : '',
-            'TEST_USER_1_EMAIL' => defined('TEST_USER_1_EMAIL') ? TEST_USER_1_EMAIL : '',
-            'TEST_USER_1_PASSWORD' => defined('TEST_USER_1_PASSWORD') ? TEST_USER_1_PASSWORD : '',
-            'TEST_USER_1_TOTP_SECRET' => defined('TEST_USER_1_TOTP_SECRET') ? TEST_USER_1_TOTP_SECRET : '',
-            'TEST_USER_1_PERSONAL_ROLE_UUID' => defined('TEST_USER_1_PERSONAL_ROLE_UUID') ? TEST_USER_1_PERSONAL_ROLE_UUID : '',
-            'TEST_USER_2_EMAIL' => defined('TEST_USER_2_EMAIL') ? TEST_USER_2_EMAIL : '',
-            'TEST_USER_2_PASSWORD' => defined('TEST_USER_2_PASSWORD') ? TEST_USER_2_PASSWORD : '',
-            'TEST_USER_2_TOTP_SECRET' => defined('TEST_USER_2_TOTP_SECRET') ? TEST_USER_2_TOTP_SECRET : '',
-            'TEST_USER_2_PERSONAL_ROLE_UUID' => defined('TEST_USER_2_PERSONAL_ROLE_UUID') ? TEST_USER_2_PERSONAL_ROLE_UUID : '',
-            'TEST_SIGING_FILE' => defined('TEST_SIGING_FILE') ? TEST_SIGING_FILE : '',
-            'TEST_SIGNATURE_DATA_URL' => defined('TEST_SIGNATURE_DATA_URL') ? TEST_SIGNATURE_DATA_URL : '',
-        ];
+        assertTestConfigKeysOrSkip([
+            'AUTH_URL',
+            'CLIENT_ID',
+            'CLIENT_SECRET',
+            'TEST_USER_1_EMAIL',
+            'TEST_USER_1_PASSWORD',
+            'TEST_USER_1_TOTP_SECRET',
+            'TEST_USER_1_PERSONAL_ROLE_UUID',
+            'TEST_USER_2_EMAIL',
+            'TEST_USER_2_PASSWORD',
+            'TEST_USER_2_TOTP_SECRET',
+            'TEST_USER_2_PERSONAL_ROLE_UUID',
+        ]);
 
-        foreach ($required as $key => $value) {
-            if (!is_string($value) || trim($value) === '') {
-                test()->markTestSkipped("Missing required test config constant: {$key}");
-            }
+        if (!defined('TEST_SIGING_FILE') || !is_string(TEST_SIGING_FILE) || trim(TEST_SIGING_FILE) === '') {
+            test()->markTestSkipped('Missing required test config constant: TEST_SIGING_FILE');
+        }
+        if (!defined('TEST_SIGNATURE_DATA_URL') || !is_string(TEST_SIGNATURE_DATA_URL) || trim(TEST_SIGNATURE_DATA_URL) === '') {
+            test()->markTestSkipped('Missing required test config constant: TEST_SIGNATURE_DATA_URL');
         }
 
         if (!is_file(TEST_SIGING_FILE) || !is_readable(TEST_SIGING_FILE)) {
@@ -47,7 +46,7 @@ final class SigningFlowHelper
     }
 
     /**
-     * Sign in as TEST_USER_1 and POST /account/active-role with TEST_USER_1_PERSONAL_ROLE_UUID
+     * Sign in as TEST_USER_1 and POST /account/active-role with resolvedTestConfigValue('TEST_USER_1_PERSONAL_ROLE_UUID')
      * before any document create/send (personal envelope ownership).
      */
     public static function bearerForUser1(): string
@@ -56,7 +55,7 @@ final class SigningFlowHelper
     }
 
     /**
-     * Sign in as TEST_USER_2 and POST /account/active-role with TEST_USER_2_PERSONAL_ROLE_UUID.
+     * Sign in as TEST_USER_2 and POST /account/active-role with resolvedTestConfigValue('TEST_USER_2_PERSONAL_ROLE_UUID').
      */
     public static function bearerForUser2(): string
     {
@@ -91,14 +90,14 @@ final class SigningFlowHelper
             'y' => 40,
             'page' => 1,
             'type' => 'SIGNATURE',
-            'email' => TEST_USER_2_EMAIL,
+            'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
             'width' => 200,
             'height' => 80,
             'required' => true,
         ]]);
         self::setSigners($user1Bearer, $uuid, [[
             'customer_role_id' => null,
-            'email' => TEST_USER_2_EMAIL,
+            'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
             'signing_order' => 1,
             'signing_type' => 'SIGNATURE',
             'send_email' => false,
@@ -120,7 +119,7 @@ final class SigningFlowHelper
      */
     public static function createDocument(string $bearer, string $documentName, string $pdfContent): string
     {
-        [$status, $json, $raw] = ApiAuthHelper::apiRequest('POST', API_URL . 'documents', $bearer, [
+        [$status, $json, $raw] = ApiAuthHelper::apiRequest('POST', resolveTestConfig('API_URL') . 'documents', $bearer, [
             'multipart' => [
                 ['name' => 'name', 'contents' => $documentName],
                 ['name' => 'signature_level', 'contents' => 'QUALIFIED'],
@@ -150,7 +149,7 @@ final class SigningFlowHelper
     {
         [$status, $json, $raw] = ApiAuthHelper::apiRequest(
             'POST',
-            API_URL . 'documents/' . rawurlencode($uuid) . '/annotations',
+            resolveTestConfig('API_URL') . 'documents/' . rawurlencode($uuid) . '/annotations',
             $bearer,
             ['form_params' => ['annotations' => json_encode($annotations)]]
         );
@@ -168,7 +167,7 @@ final class SigningFlowHelper
     {
         [$status, $json, $raw] = ApiAuthHelper::apiRequest(
             'POST',
-            API_URL . 'documents/' . rawurlencode($uuid) . '/signers',
+            resolveTestConfig('API_URL') . 'documents/' . rawurlencode($uuid) . '/signers',
             $bearer,
             ['form_params' => ['signers' => json_encode($signers)]]
         );
@@ -188,7 +187,7 @@ final class SigningFlowHelper
     {
         [$status, $json, $raw] = ApiAuthHelper::apiRequest(
             'GET',
-            API_URL . 'documents/' . rawurlencode($uuid),
+            resolveTestConfig('API_URL') . 'documents/' . rawurlencode($uuid),
             $bearer
         );
 
@@ -224,7 +223,7 @@ final class SigningFlowHelper
         for ($i = 0; $i < $attempts; $i++) {
             $last = ApiAuthHelper::apiRequest(
                 'GET',
-                API_URL . 'documents/' . rawurlencode($uuid),
+                resolveTestConfig('API_URL') . 'documents/' . rawurlencode($uuid),
                 $bearer
             );
             [$status] = $last;
@@ -265,7 +264,7 @@ final class SigningFlowHelper
     {
         [$status, $json, $raw] = ApiAuthHelper::apiRequest(
             'POST',
-            API_URL . 'documents/' . rawurlencode($uuid) . '/send',
+            resolveTestConfig('API_URL') . 'documents/' . rawurlencode($uuid) . '/send',
             $bearer
         );
 
@@ -300,7 +299,7 @@ final class SigningFlowHelper
     {
         [$status, $json, $raw] = ApiAuthHelper::apiRequest(
             'GET',
-            API_URL . 'documents',
+            resolveTestConfig('API_URL') . 'documents',
             $bearer
         );
 
@@ -360,7 +359,7 @@ final class SigningFlowHelper
     {
         return ApiAuthHelper::apiRequest(
             'GET',
-            API_URL . 'signing/' . rawurlencode($signCode),
+            resolveTestConfig('API_URL') . 'signing/' . rawurlencode($signCode),
             $bearer
         );
     }
@@ -375,7 +374,7 @@ final class SigningFlowHelper
     {
         return ApiAuthHelper::apiRequest(
             'GET',
-            API_URL . 'signing/' . rawurlencode($signCode) . '/file',
+            resolveTestConfig('API_URL') . 'signing/' . rawurlencode($signCode) . '/file',
             $bearer,
             ['headers' => ['Accept' => 'application/pdf']]
         );
@@ -474,7 +473,7 @@ final class SigningFlowHelper
     {
         return ApiAuthHelper::apiRequest(
             'POST',
-            API_URL . 'signing/' . rawurlencode($signCode) . '/reject',
+            resolveTestConfig('API_URL') . 'signing/' . rawurlencode($signCode) . '/reject',
             $bearer,
             [
                 'form_params' => [
@@ -493,7 +492,7 @@ final class SigningFlowHelper
     {
         return ApiAuthHelper::apiRequest(
             'POST',
-            API_URL . 'documents/' . rawurlencode($uuid) . '/cancel',
+            resolveTestConfig('API_URL') . 'documents/' . rawurlencode($uuid) . '/cancel',
             $bearer,
             [
                 'form_params' => [
@@ -522,7 +521,7 @@ final class SigningFlowHelper
 
         $out = ApiAuthHelper::apiRequest(
             'POST',
-            API_URL . 'signing/' . rawurlencode($signCode) . '/sign',
+            resolveTestConfig('API_URL') . 'signing/' . rawurlencode($signCode) . '/sign',
             $bearer,
             [
                 'form_params' => [

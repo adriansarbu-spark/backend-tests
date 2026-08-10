@@ -42,7 +42,7 @@ beforeAll(function () {
  * 2. Expect **HTTP 400** and **`invalid_email`** in **`error`** (no invitation row implied).
  */
 test('Team invitations - POST rejects invalid email', function () {
-    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     [$status, $json, $raw] = TeamApiHelper::postJson(TeamApiHelper::invitationsUrl(), $bearer, [
         'email' => 'not-an-email',
         'role_code' => 'employee',
@@ -62,7 +62,7 @@ test('Team invitations - POST rejects invalid email', function () {
  * 2. Expect **HTTP 400** and **`invalid_role_code`**.
  */
 test('Team invitations - POST rejects disallowed role_code', function () {
-    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     [$status, $json, $raw] = TeamApiHelper::postJson(TeamApiHelper::invitationsUrl(), $bearer, [
         'email' => 'valid-role-test+' . gmdate('YmdHis') . '@example.com',
         'role_code' => 'superuser',

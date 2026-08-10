@@ -45,7 +45,7 @@ beforeAll(function () {
  * 4. Open that template by id; expect non-empty **`content`**, **`parties`** and **`smartfields`** arrays, and **`visibility`** **private**.
  */
 test('Templates - add from library creates a private draft in my templates', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $libraryBase = TemplatesApiHelper::libraryApiBase();
     $templatesBase = TemplatesApiHelper::apiBase();
 
@@ -146,7 +146,7 @@ test('Templates - add from library creates a private draft in my templates', fun
  * 2. Expect **not found** (**HTTP 404**); **`error`** non-empty when JSON is returned.
  */
 test('Templates - add from library with unknown id returns not found', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $libraryBase = TemplatesApiHelper::libraryApiBase();
     $fakeUuid = '00000000-0000-4000-8000-000000000001';
 

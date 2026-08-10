@@ -8,54 +8,48 @@ final class ReferralsApiHelper
 {
     public static function referralsUrl(): string
     {
-        return API_URL . 'referrals';
+        return resolveTestConfig('API_URL') . 'referrals';
     }
 
     public static function validateUrl(string $code): string
     {
-        return API_URL . 'referrals/validate?code=' . rawurlencode($code);
+        return resolveTestConfig('API_URL') . 'referrals/validate?code=' . rawurlencode($code);
     }
 
     public static function statusUrl(): string
     {
-        return API_URL . 'referrals/status';
+        return resolveTestConfig('API_URL') . 'referrals/status';
     }
 
     public static function campaignUrl(): string
     {
-        return API_URL . 'referrals/campaign';
+        return resolveTestConfig('API_URL') . 'referrals/campaign';
     }
 
     public static function inviteUrl(): string
     {
-        return API_URL . 'referrals/invite';
+        return resolveTestConfig('API_URL') . 'referrals/invite';
     }
 
     public static function inviteSendUrl(): string
     {
-        return API_URL . 'referrals/invite/send';
+        return resolveTestConfig('API_URL') . 'referrals/invite/send';
     }
 
     public static function remindUrl(): string
     {
-        return API_URL . 'referrals/remind';
+        return resolveTestConfig('API_URL') . 'referrals/remind';
     }
 
     public static function assertRequiredConfigOrSkip(): void
     {
-        $required = [
-            'AUTH_URL' => defined('AUTH_URL') ? AUTH_URL : '',
-            'CLIENT_ID' => defined('CLIENT_ID') ? CLIENT_ID : '',
-            'CLIENT_SECRET' => defined('CLIENT_SECRET') ? CLIENT_SECRET : '',
-            'TEST_USER_1_EMAIL' => defined('TEST_USER_1_EMAIL') ? TEST_USER_1_EMAIL : '',
-            'TEST_USER_1_PASSWORD' => defined('TEST_USER_1_PASSWORD') ? TEST_USER_1_PASSWORD : '',
-        ];
-
-        foreach ($required as $key => $value) {
-            if (!is_string($value) || trim($value) === '') {
-                test()->markTestSkipped("Missing required test config constant: {$key}");
-            }
-        }
+        assertTestConfigKeysOrSkip([
+            'AUTH_URL',
+            'CLIENT_ID',
+            'CLIENT_SECRET',
+            'TEST_USER_1_EMAIL',
+            'TEST_USER_1_PASSWORD',
+        ]);
     }
 
     /**
@@ -95,6 +89,6 @@ final class ReferralsApiHelper
 
     public static function bearerForTestUser1(): string
     {
-        return ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+        return ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     }
 }

@@ -42,7 +42,7 @@ beforeAll(function () {
  * 2. Expect **HTTP 200** and **`data`** as an array; for the first row that has an id, check version and count fields look numeric and **`status`** / **`category_code`** are non-empty.
  */
 test('Library - list loads and first rows look well shaped', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $libraryBase = TemplatesApiHelper::libraryApiBase();
 
     [$st, $json, $raw] = ApiAuthHelper::apiRequest(
@@ -78,7 +78,7 @@ test('Library - list loads and first rows look well shaped', function () {
  * 2. Expect **HTTP 200** and **`data`** as an array.
  */
 test('Library - list accepts category and language filters', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $libraryBase = TemplatesApiHelper::libraryApiBase();
 
     [$st, $json, $raw] = ApiAuthHelper::apiRequest(
@@ -100,7 +100,7 @@ test('Library - list accepts category and language filters', function () {
  * 2. Open that row; expect **HTTP 200**, matching **`data.uuid`**, **`parties`** / **`smartfields`** arrays present, and **`can_archive`** is a boolean.
  */
 test('Library - single item shows parties, smartfields, and archive flag', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $libraryBase = TemplatesApiHelper::libraryApiBase();
 
     [$listSt, $listJson] = ApiAuthHelper::apiRequest(
@@ -147,7 +147,7 @@ test('Library - single item shows parties, smartfields, and archive flag', funct
  * 3. Expect **HTTP 200** and **`data`** as an array; the first version row has a non-empty id, a version number field, and non-empty **`status`**.
  */
 test('Library - version history returns rows for a published item', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $libraryBase = TemplatesApiHelper::libraryApiBase();
 
     [$listSt, $listJson] = ApiAuthHelper::apiRequest(
@@ -198,7 +198,7 @@ test('Library - version history returns rows for a published item', function () 
  * 2. Expect **not found** (**HTTP 404**); **`error`** non-empty when JSON is returned.
  */
 test('Library - unknown id returns not found', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $libraryBase = TemplatesApiHelper::libraryApiBase();
     $fake = '00000000-0000-4000-8000-000000000099';
 

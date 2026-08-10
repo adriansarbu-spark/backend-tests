@@ -42,7 +42,7 @@ beforeAll(function () {
  * 2. Expect **HTTP 400** and **`error`** containing **`name_required`**.
  */
 test('Account companies - POST without a name is rejected', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $body = AccountCompaniesApiHelper::validCreatePayload(gmdate('YmdHis'));
     $body['name'] = '   ';
 
@@ -61,7 +61,7 @@ test('Account companies - POST without a name is rejected', function () {
  * 2. Expect **HTTP 400** and **`country_invalid`** (only ISO-2 is accepted).
  */
 test('Account companies - POST rejects non ISO-2 country codes', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $body = AccountCompaniesApiHelper::validCreatePayload(gmdate('YmdHis'));
     $body['country'] = 'ROU';
 
@@ -80,7 +80,7 @@ test('Account companies - POST rejects non ISO-2 country codes', function () {
  * 2. Expect **HTTP 400** and **`country_required`**.
  */
 test('Account companies - POST rejects missing country', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $body = AccountCompaniesApiHelper::validCreatePayload(gmdate('YmdHis'));
     $body['country'] = '  ';
 
@@ -98,7 +98,7 @@ test('Account companies - POST rejects missing country', function () {
  * 2. Expect **HTTP 400** and **`tin_required`**.
  */
 test('Account companies - POST rejects empty TIN after RO normalization', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $body = AccountCompaniesApiHelper::validCreatePayload(gmdate('YmdHis'));
     $body['tin'] = 'abc';
 
@@ -116,7 +116,7 @@ test('Account companies - POST rejects empty TIN after RO normalization', functi
  * 2. Expect **HTTP 400** and **`registration_number_required`**.
  */
 test('Account companies - POST rejects missing registration number', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $body = AccountCompaniesApiHelper::validCreatePayload(gmdate('YmdHis'));
     $body['registration_number'] = '';
 
@@ -134,7 +134,7 @@ test('Account companies - POST rejects missing registration number', function ()
  * 2. Expect **HTTP 400** and **`fiscal_address_required`**.
  */
 test('Account companies - POST rejects missing fiscal address', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $body = AccountCompaniesApiHelper::validCreatePayload(gmdate('YmdHis'));
     unset($body['fiscal_address']);
 
@@ -152,7 +152,7 @@ test('Account companies - POST rejects missing fiscal address', function () {
  * 2. Expect **HTTP 400** and **`headquarters_address_required`**.
  */
 test('Account companies - POST rejects missing headquarters address', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $body = AccountCompaniesApiHelper::validCreatePayload(gmdate('YmdHis'));
     unset($body['headquarters_address']);
 

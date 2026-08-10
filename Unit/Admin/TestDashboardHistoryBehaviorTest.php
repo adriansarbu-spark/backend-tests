@@ -77,8 +77,8 @@ test('admin tests controller loads dashboard history window and trims run poll p
 
     expect($controller)->not->toBeFalse();
     expect($controller)->toContain('loadHistoryForDashboard($historyWarning)');
-    expect($controller)->toContain("\$state['test_pass_history'] = \$this->getTestPassHistoryService()->filterHistoryToLastDays(");
-    expect($controller)->toContain('TestPassHistoryService::DASHBOARD_HISTORY_MAX_DAYS');
+    expect($controller)->toContain('filterHistoryForDashboardExport($state[\'test_pass_history\'])');
+    expect($controller)->toContain('getPassHistory(365, \'all\')');
 });
 
 test('run-both reuses same suite execution helper as runUnitNow and runFeatureNow', function () {

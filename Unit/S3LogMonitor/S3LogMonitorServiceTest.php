@@ -99,3 +99,55 @@ test('s3 log monitor service records per-folder checks without touching a real d
 	expect($runStore->checks[0]['allowed_days'])->toBe(7);
 	expect($notifier->recipients)->toBe(array());
 });
+
+test('s3 log monitor service downgrades freshness failure to warning for opted-in folder', function () {
+	$rule = new S3LogMonitorRule(array(
+		's3_log_monitor_folder_id' => 3,
+		'base_path'                => 'qtsp-logs/dr/hsm/hsmdr',
+		'allowed_days'             => 7,
+		'timezone'                 => 'UTC',
+		'should_send_warnings'     => 1,
+	));
+	$runStore = new S3LogMonitorRecordingRunStore();
+	$service = new S3LogMonitorService(
+		new S3LogMonitorStaticRuleProvider(array($rule)),
+		new FakeS3ObjectLister(array()),
+		new S3LogMonitorRecordingEmailNotifier(),
+		new Registry(),
+		$runStore
+	);
+
+	$result = $service->run(true);
+
+	expect($result['rows'][0]->status)->toBe('warning');
+	expect($result['summary']['run_status'])->toBe('pass_with_warnings');
+	expect($result['summary']['folders_warnings'])->toBe('1');
+	expect($result['summary']['folders_failed'])->toBe('0');
+	expect($runStore->checks[0]['status'])->toBe('warning');
+});
+
+test('s3 log monitor service never downgrades s3 errors to warnings', function () {
+	$rule = new S3LogMonitorRule(array(
+		's3_log_monitor_folder_id' => 4,
+		'base_path'                => 'qtsp-logs/dr/sam/samdr',
+		'should_send_warnings'     => 1,
+	));
+	$lister = new class implements S3ObjectListerInterface {
+		public function listObjectsV2(array $params) {
+			throw new RuntimeException('S3 unavailable');
+		}
+	};
+	$service = new S3LogMonitorService(
+		new S3LogMonitorStaticRuleProvider(array($rule)),
+		$lister,
+		new S3LogMonitorRecordingEmailNotifier(),
+		new Registry(),
+		new S3LogMonitorRecordingRunStore()
+	);
+
+	$result = $service->run(true);
+
+	expect($result['rows'][0]->status)->toBe('error');
+	expect($result['summary']['run_status'])->toBe('fail');
+	expect($result['summary']['folders_errors'])->toBe('1');
+});

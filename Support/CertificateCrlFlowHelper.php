@@ -17,21 +17,18 @@ final class CertificateCrlFlowHelper
 
     public static function assertRequiredConfigOrSkip(): void
     {
-        $required = [
-            'AUTH_URL' => defined('AUTH_URL') ? AUTH_URL : '',
-            'CLIENT_ID' => defined('CLIENT_ID') ? CLIENT_ID : '',
-            'CLIENT_SECRET' => defined('CLIENT_SECRET') ? CLIENT_SECRET : '',
-            'TEST_USER_1_EMAIL' => defined('TEST_USER_1_EMAIL') ? TEST_USER_1_EMAIL : '',
-            'TEST_USER_1_PASSWORD' => defined('TEST_USER_1_PASSWORD') ? TEST_USER_1_PASSWORD : '',
-            'TEST_USER_1_TOTP_SECRET' => defined('TEST_USER_1_TOTP_SECRET') ? TEST_USER_1_TOTP_SECRET : '',
-            'CRL_POLL_INTERVAL_MS' => defined('CRL_POLL_INTERVAL_MS') ? (string)CRL_POLL_INTERVAL_MS : '',
-            'CRL_MAX_TIMEOUT_SEC' => defined('CRL_MAX_TIMEOUT_SEC') ? (string)CRL_MAX_TIMEOUT_SEC : '',
-            'CRL_SLA_PROPAGATION_MS' => defined('CRL_SLA_PROPAGATION_MS') ? (string)CRL_SLA_PROPAGATION_MS : '',
-        ];
+        assertTestConfigKeysOrSkip([
+            'AUTH_URL',
+            'CLIENT_ID',
+            'CLIENT_SECRET',
+            'TEST_USER_1_EMAIL',
+            'TEST_USER_1_PASSWORD',
+            'TEST_USER_1_TOTP_SECRET',
+        ]);
 
-        foreach ($required as $key => $value) {
-            if (!is_string($value) || trim($value) === '') {
-                test()->markTestSkipped("Missing required test config constant: {$key}");
+        foreach (array('CRL_POLL_INTERVAL_MS', 'CRL_MAX_TIMEOUT_SEC', 'CRL_SLA_PROPAGATION_MS') as $key) {
+            if (!defined($key) || trim((string)constant($key)) === '') {
+                test()->markTestSkipped('Missing required test config constant: ' . $key);
             }
         }
 
@@ -48,30 +45,21 @@ final class CertificateCrlFlowHelper
     {
         self::assertRequiredConfigOrSkip();
 
-        $required = [
-            'CRL_THIS_UPDATE_MAX_AGE_SEC' => defined('CRL_THIS_UPDATE_MAX_AGE_SEC')
-                ? (string)CRL_THIS_UPDATE_MAX_AGE_SEC
-                : '',
-            'CRL_NEXT_UPDATE_WARNING_SEC' => defined('CRL_NEXT_UPDATE_WARNING_SEC')
-                ? (string)CRL_NEXT_UPDATE_WARNING_SEC
-                : '',
-        ];
-
-        foreach ($required as $key => $value) {
-            if (!is_string($value) || trim($value) === '') {
-                test()->markTestSkipped("Missing required test config constant: {$key}");
+        foreach (array('CRL_THIS_UPDATE_MAX_AGE_SEC', 'CRL_NEXT_UPDATE_WARNING_SEC') as $key) {
+            if (!defined($key) || trim((string)constant($key)) === '') {
+                test()->markTestSkipped('Missing required test config constant: ' . $key);
             }
         }
     }
 
     public static function bearerForUser1(): string
     {
-        return ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+        return ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     }
 
     public static function certificatesUrl(): string
     {
-        return API_URL . 'account/certificates';
+        return resolveTestConfig('API_URL') . 'account/certificates';
     }
 
     public static function certificatesListUrl(int $page = 1, int $perPage = 20): string
@@ -814,7 +802,7 @@ final class CertificateCrlFlowHelper
     public static function revokeCertificate(string $bearer, string $certificateUuid): array
     {
         return self::postJson(self::revokeUrl($certificateUuid), $bearer, [
-            'totp_code' => ApiAuthHelper::getOtpFromTotpSecret(TEST_USER_1_TOTP_SECRET),
+            'totp_code' => ApiAuthHelper::getOtpFromTotpSecret(resolvedTestConfigValue('TEST_USER_1_TOTP_SECRET')),
         ]);
     }
 
@@ -835,7 +823,7 @@ final class CertificateCrlFlowHelper
         return self::postJson(self::certificatesUrl(), $bearer, [
             'usage' => $usage,
             'accepted_legal_document_uuids' => $acceptedLegalDocumentUuids,
-            'totp_code' => ApiAuthHelper::getOtpFromTotpSecret(TEST_USER_1_TOTP_SECRET),
+            'totp_code' => ApiAuthHelper::getOtpFromTotpSecret(resolvedTestConfigValue('TEST_USER_1_TOTP_SECRET')),
         ]);
     }
 

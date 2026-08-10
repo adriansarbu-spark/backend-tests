@@ -13,27 +13,27 @@ final class TeamApiHelper
 {
     public static function invitationsUrl(): string
     {
-        return API_URL . 'team/invitations';
+        return resolveTestConfig('API_URL') . 'team/invitations';
     }
 
     public static function invitationsRevokeUrl(): string
     {
-        return API_URL . 'team/invitations/revoke';
+        return resolveTestConfig('API_URL') . 'team/invitations/revoke';
     }
 
     public static function invitationsResendUrl(): string
     {
-        return API_URL . 'team/invitations/resend';
+        return resolveTestConfig('API_URL') . 'team/invitations/resend';
     }
 
     public static function membersUrl(): string
     {
-        return API_URL . 'team/members';
+        return resolveTestConfig('API_URL') . 'team/members';
     }
 
     public static function membersTerminateUrl(string $roleUuid): string
     {
-        return API_URL . 'team/members/' . rawurlencode($roleUuid) . '/terminate';
+        return resolveTestConfig('API_URL') . 'team/members/' . rawurlencode($roleUuid) . '/terminate';
     }
 
     /**
@@ -41,19 +41,13 @@ final class TeamApiHelper
      */
     public static function assertRequiredConfigOrSkip(): void
     {
-        $required = [
-            'AUTH_URL' => defined('AUTH_URL') ? AUTH_URL : '',
-            'CLIENT_ID' => defined('CLIENT_ID') ? CLIENT_ID : '',
-            'CLIENT_SECRET' => defined('CLIENT_SECRET') ? CLIENT_SECRET : '',
-            'TEST_USER_1_EMAIL' => defined('TEST_USER_1_EMAIL') ? TEST_USER_1_EMAIL : '',
-            'TEST_USER_1_PASSWORD' => defined('TEST_USER_1_PASSWORD') ? TEST_USER_1_PASSWORD : '',
-        ];
-
-        foreach ($required as $key => $value) {
-            if (!is_string($value) || trim($value) === '') {
-                test()->markTestSkipped("Missing required test config constant: {$key}");
-            }
-        }
+        assertTestConfigKeysOrSkip([
+            'AUTH_URL',
+            'CLIENT_ID',
+            'CLIENT_SECRET',
+            'TEST_USER_1_EMAIL',
+            'TEST_USER_1_PASSWORD',
+        ]);
     }
 
     /**
@@ -62,15 +56,10 @@ final class TeamApiHelper
     public static function assertUserTwoConfigOrSkip(): void
     {
         self::assertRequiredConfigOrSkip();
-        $required = [
-            'TEST_USER_2_EMAIL' => defined('TEST_USER_2_EMAIL') ? TEST_USER_2_EMAIL : '',
-            'TEST_USER_2_PASSWORD' => defined('TEST_USER_2_PASSWORD') ? TEST_USER_2_PASSWORD : '',
-        ];
-        foreach ($required as $key => $value) {
-            if (!is_string($value) || trim($value) === '') {
-                test()->markTestSkipped("Missing required test config constant: {$key}");
-            }
-        }
+        assertTestConfigKeysOrSkip([
+            'TEST_USER_2_EMAIL',
+            'TEST_USER_2_PASSWORD',
+        ]);
     }
 
     /**
@@ -79,10 +68,7 @@ final class TeamApiHelper
     public static function assertTotpConfigOrSkip(): void
     {
         self::assertRequiredConfigOrSkip();
-        $totp = defined('TEST_USER_1_TOTP_SECRET') ? TEST_USER_1_TOTP_SECRET : '';
-        if (!is_string($totp) || trim($totp) === '') {
-            test()->markTestSkipped('Missing required test config constant: TEST_USER_1_TOTP_SECRET');
-        }
+        assertTestConfigKeysOrSkip(['TEST_USER_1_TOTP_SECRET']);
     }
 
     /**

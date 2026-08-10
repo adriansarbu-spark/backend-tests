@@ -44,7 +44,7 @@ beforeAll(function () {
  */
 test('Account companies - owner can create a company and see it in their list with normalized TIN', function () {
     $token = gmdate('YmdHis') . '-' . bin2hex(random_bytes(3));
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $body = AccountCompaniesApiHelper::validCreatePayload($token);
 
     [$postStatus, $postJson, $postRaw] = AccountCompaniesApiHelper::postJson($bearer, $body);
@@ -91,8 +91,8 @@ test('Account companies - owner can create a company and see it in their list wi
  */
 test('Account companies - another user’s list does not include your new company', function () {
     $token = gmdate('YmdHis') . '-' . bin2hex(random_bytes(3));
-    $bearer1 = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $bearer2 = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $bearer1 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
+    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
 
     [$postStatus, $postJson, $postRaw] = AccountCompaniesApiHelper::postJson(
         $bearer1,
@@ -120,7 +120,7 @@ test('Account companies - another user’s list does not include your new compan
  */
 test('Account companies - create accepts optional VAT number and surfaces it on GET', function () {
     $token = gmdate('YmdHis') . '-' . bin2hex(random_bytes(3));
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $body = AccountCompaniesApiHelper::validCreatePayload($token);
     $body['vat_number'] = 'RO' . substr(preg_replace('/\D/', '', $token), 0, 8);
 

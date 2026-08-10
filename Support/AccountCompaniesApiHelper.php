@@ -14,7 +14,7 @@ final class AccountCompaniesApiHelper
      */
     public static function url(): string
     {
-        return API_URL . 'account/companies';
+        return resolveTestConfig('API_URL') . 'account/companies';
     }
 
     /**
@@ -22,7 +22,7 @@ final class AccountCompaniesApiHelper
      */
     public static function activeRoleUrl(): string
     {
-        return API_URL . 'account/active-role';
+        return resolveTestConfig('API_URL') . 'account/active-role';
     }
 
     /**
@@ -30,21 +30,15 @@ final class AccountCompaniesApiHelper
      */
     public static function assertRequiredConfigOrSkip(): void
     {
-        $required = [
-            'AUTH_URL' => defined('AUTH_URL') ? AUTH_URL : '',
-            'CLIENT_ID' => defined('CLIENT_ID') ? CLIENT_ID : '',
-            'CLIENT_SECRET' => defined('CLIENT_SECRET') ? CLIENT_SECRET : '',
-            'TEST_USER_1_EMAIL' => defined('TEST_USER_1_EMAIL') ? TEST_USER_1_EMAIL : '',
-            'TEST_USER_1_PASSWORD' => defined('TEST_USER_1_PASSWORD') ? TEST_USER_1_PASSWORD : '',
-            'TEST_USER_2_EMAIL' => defined('TEST_USER_2_EMAIL') ? TEST_USER_2_EMAIL : '',
-            'TEST_USER_2_PASSWORD' => defined('TEST_USER_2_PASSWORD') ? TEST_USER_2_PASSWORD : '',
-        ];
-
-        foreach ($required as $key => $value) {
-            if (!is_string($value) || trim($value) === '') {
-                test()->markTestSkipped("Missing required test config constant: {$key}");
-            }
-        }
+        assertTestConfigKeysOrSkip([
+            'AUTH_URL',
+            'CLIENT_ID',
+            'CLIENT_SECRET',
+            'TEST_USER_1_EMAIL',
+            'TEST_USER_1_PASSWORD',
+            'TEST_USER_2_EMAIL',
+            'TEST_USER_2_PASSWORD',
+        ]);
     }
 
     /**
@@ -160,8 +154,10 @@ final class AccountCompaniesApiHelper
 
     public static function assertRepresentativeRoleConfigOrSkip(): void
     {
-        $value = defined('TEST_USER_1_COMPANY_ID_REPRESENTATIVE') ? TEST_USER_1_COMPANY_ID_REPRESENTATIVE : '';
-        if (!is_string($value) || trim($value) === '') {
+        $value = isTestConfigDefined('TEST_USER_1_COMPANY_ID_REPRESENTATIVE')
+            ? resolvedTestConfigValue('TEST_USER_1_COMPANY_ID_REPRESENTATIVE')
+            : '';
+        if ($value === '') {
             test()->markTestSkipped('Missing required test config constant: TEST_USER_1_COMPANY_ID_REPRESENTATIVE');
         }
     }
@@ -169,7 +165,7 @@ final class AccountCompaniesApiHelper
     /**
      * Resolve role_uuid for Company Representative context (TEST_USER_1).
      *
-     * Matches {@see TEST_USER_1_COMPANY_ID_REPRESENTATIVE} against listed companies:
+     * Matches {@see resolvedTestConfigValue('TEST_USER_1_COMPANY_ID_REPRESENTATIVE')} against listed companies:
      * - company_uuid → first non-personal role in that company
      * - role_uuid → returned as-is
      * - otherwise → constant value used directly (typical dev fixture)
@@ -177,7 +173,7 @@ final class AccountCompaniesApiHelper
     public static function resolveUser1CompanyRepresentativeRoleUuid(string $bearer): string
     {
         self::assertRepresentativeRoleConfigOrSkip();
-        $needle = trim((string)TEST_USER_1_COMPANY_ID_REPRESENTATIVE);
+        $needle = trim(resolvedTestConfigValue('TEST_USER_1_COMPANY_ID_REPRESENTATIVE'));
 
         [$status, $json] = self::get($bearer);
         if ($status !== 200 || !is_array($json)) {
@@ -278,23 +274,29 @@ final class AccountCompaniesApiHelper
     }
 
     /**
-     * Sign in as TEST_USER_1 and POST /account/active-role with TEST_USER_1_PERSONAL_ROLE_UUID.
+     * Sign in as TEST_USER_1 and POST /account/active-role with resolvedTestConfigValue('TEST_USER_1_PERSONAL_ROLE_UUID').
      */
     public static function bearerForUser1Personal(): string
     {
-        $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-        self::switchTestUserToPersonalRole($bearer, (string)TEST_USER_1_PERSONAL_ROLE_UUID, 'TEST_USER_1');
+        $bearer = ApiAuthHelper::bearerTokenFor(
+            resolvedTestConfigValue('TEST_USER_1_EMAIL'),
+            resolvedTestConfigValue('TEST_USER_1_PASSWORD')
+        );
+        self::switchTestUserToPersonalRole($bearer, resolvedTestConfigValue('TEST_USER_1_PERSONAL_ROLE_UUID'), 'TEST_USER_1');
 
         return $bearer;
     }
 
     /**
-     * Sign in as TEST_USER_2 and POST /account/active-role with TEST_USER_2_PERSONAL_ROLE_UUID.
+     * Sign in as TEST_USER_2 and POST /account/active-role with resolvedTestConfigValue('TEST_USER_2_PERSONAL_ROLE_UUID').
      */
     public static function bearerForUser2Personal(): string
     {
-        $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
-        self::switchTestUserToPersonalRole($bearer, (string)TEST_USER_2_PERSONAL_ROLE_UUID, 'TEST_USER_2');
+        $bearer = ApiAuthHelper::bearerTokenFor(
+            resolvedTestConfigValue('TEST_USER_2_EMAIL'),
+            resolvedTestConfigValue('TEST_USER_2_PASSWORD')
+        );
+        self::switchTestUserToPersonalRole($bearer, resolvedTestConfigValue('TEST_USER_2_PERSONAL_ROLE_UUID'), 'TEST_USER_2');
 
         return $bearer;
     }
@@ -304,7 +306,9 @@ final class AccountCompaniesApiHelper
      */
     public static function ensureTestUser1PersonalActiveRole(): void
     {
-        if (!defined('TEST_USER_1_EMAIL') || !defined('TEST_USER_1_PASSWORD') || !defined('TEST_USER_1_PERSONAL_ROLE_UUID')) {
+        if (!isTestConfigDefined('TEST_USER_1_EMAIL')
+            || !isTestConfigDefined('TEST_USER_1_PASSWORD')
+            || !isTestConfigDefined('TEST_USER_1_PERSONAL_ROLE_UUID')) {
             return;
         }
 
@@ -318,11 +322,13 @@ final class AccountCompaniesApiHelper
     {
         self::ensureTestUser1PersonalActiveRole();
 
-        if (!defined('TEST_USER_2_EMAIL') || !defined('TEST_USER_2_PASSWORD') || !defined('TEST_USER_2_PERSONAL_ROLE_UUID')) {
+        if (!isTestConfigDefined('TEST_USER_2_EMAIL')
+            || !isTestConfigDefined('TEST_USER_2_PASSWORD')
+            || !isTestConfigDefined('TEST_USER_2_PERSONAL_ROLE_UUID')) {
             return;
         }
 
-        if (!is_string(TEST_USER_2_EMAIL) || trim(TEST_USER_2_EMAIL) === '') {
+        if (resolvedTestConfigValue('TEST_USER_2_EMAIL') === '') {
             return;
         }
 

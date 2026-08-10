@@ -41,3 +41,30 @@ test('s3 log monitor excel exporter writes summary and details sheets', function
 	@unlink($outputPath);
 	@rmdir($outputDir);
 });
+
+test('s3 log monitor excel exporter renders warning summary and severity ordering', function () {
+	$rule = new S3LogMonitorRule(array('base_path' => 'logs/example', 'label' => 'Example'));
+	$rows = array(
+		new S3LogMonitorResultRow($rule, 'pass'),
+		new S3LogMonitorResultRow($rule, 'warning', 'No recent logs'),
+		new S3LogMonitorResultRow($rule, 'error', 'S3 unavailable'),
+		new S3LogMonitorResultRow($rule, 'fail', 'Too old'),
+	);
+	$summary = (new S3LogMonitorReport())->buildSummary(
+		$rows,
+		new DateTimeImmutable('2026-07-21 07:00:00', new DateTimeZone('UTC'))
+	);
+	$spreadsheet = (new S3LogMonitorExcelExporter())->buildSpreadsheet($summary, $rows);
+	$summarySheet = $spreadsheet->getSheet(0);
+	$detailsSheet = $spreadsheet->getSheet(1);
+
+	expect($summarySheet->getCell('B2')->getValue())->toBe('Failed');
+	expect($summarySheet->getCell('E2')->getValue())->toBe(1);
+	expect($detailsSheet->getCell('G1')->getValue())->toBe('Message');
+	expect($detailsSheet->getCell('F2')->getValue())->toBe('FAIL');
+	expect($detailsSheet->getCell('F3')->getValue())->toBe('ERROR');
+	expect($detailsSheet->getCell('F4')->getValue())->toBe('WARNING');
+	expect($detailsSheet->getCell('F5')->getValue())->toBe('PASS');
+	expect($detailsSheet->getStyle('F3')->getFill()->getStartColor()->getARGB())
+		->not->toBe($detailsSheet->getStyle('F4')->getFill()->getStartColor()->getARGB());
+});

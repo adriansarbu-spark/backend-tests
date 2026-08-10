@@ -42,3 +42,36 @@ test('s3 log monitor report marks all-pass run as ok', function () {
 	expect($summary['problem_count'])->toBe('0');
 	expect($summary['summary_section'])->toContain("Overall Status:       OK");
 });
+
+test('s3 log monitor report applies warning aggregation precedence and separate counts', function () {
+	$rule = new S3LogMonitorRule(array('base_path' => 'logs/example'));
+	$report = new S3LogMonitorReport();
+	$checkedAt = new DateTimeImmutable('2026-07-21 07:00:00', new DateTimeZone('UTC'));
+	$build = function (array $statuses) use ($rule, $report, $checkedAt) {
+		$rows = array_map(function ($status) use ($rule) {
+			return new S3LogMonitorResultRow($rule, $status);
+		}, $statuses);
+
+		return $report->buildSummary($rows, $checkedAt);
+	};
+
+	$pass = $build(array());
+	$warnings = $build(array('pass', 'warning'));
+	$warningAndFail = $build(array('pass', 'warning', 'fail'));
+	$warningAndError = $build(array('warning', 'error'));
+
+	expect($pass['run_status'])->toBe('pass');
+	expect($warnings['run_status'])->toBe('pass_with_warnings');
+	expect($warnings['overall_status'])->toBe('OK WITH WARNINGS');
+	expect($warnings['folders_checked'])->toBe('2');
+	expect($warnings['folders_passed'])->toBe('1');
+	expect($warnings['folders_warnings'])->toBe('1');
+	expect($warnings['folders_failed'])->toBe('0');
+	expect($warnings['problem_count'])->toBe('0');
+	expect($warnings['summary_section'])->toContain('Warnings:');
+	expect($warningAndFail['run_status'])->toBe('fail');
+	expect($warningAndFail['folders_warnings'])->toBe('1');
+	expect($warningAndFail['folders_failed'])->toBe('1');
+	expect($warningAndError['run_status'])->toBe('fail');
+	expect($warningAndError['folders_errors'])->toBe('1');
+});

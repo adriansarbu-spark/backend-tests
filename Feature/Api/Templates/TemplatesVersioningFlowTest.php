@@ -44,7 +44,7 @@ beforeAll(function () {
  * 4. Archive again; expect **HTTP 422** with non-empty **`error`** (invalid transition).
  */
 test('Templates - publish then archive; repeat actions get a validation error', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $apiBase = TemplatesApiHelper::apiBase();
 
     [$apiBaseResolved, $uuid] = TemplatesApiHelper::createTemplateForFlow($bearer, [], $apiBase);
@@ -107,7 +107,7 @@ test('Templates - publish then archive; repeat actions get a validation error', 
  * 2. Expect refusal (**HTTP 422**); when the API returns structured validation, expect **`VALIDATION_ERROR`** on **`content`**, otherwise any non-empty **`error`** payload.
  */
 test('Templates - new version without body is rejected', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     [$apiBaseResolved, $templateUuid] = TemplatesApiHelper::createTemplateForFlow($bearer);
 
     [$st, $json] = ApiAuthHelper::apiRequest(
@@ -135,7 +135,7 @@ test('Templates - new version without body is rejected', function () {
  * 2. Expect **HTTP 422**; if JSON is returned, **`error`** must not be empty.
  */
 test('Templates - invalid sort on version list is rejected', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     [$apiBaseResolved, $templateUuid] = TemplatesApiHelper::createTemplateForFlow($bearer);
 
     [$st, $json] = ApiAuthHelper::apiRequest(
@@ -160,7 +160,7 @@ test('Templates - invalid sort on version list is rejected', function () {
  * 3. Start an edit from the still-published original; expect **HTTP 200** and a **new** draft id in **`data.uuid`** with **`data.status`** **draft**.
  */
 test('Templates - duplicate published template and edit published yields a new draft', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     [$apiBaseResolved, $uuid] = TemplatesApiHelper::createTemplateForFlow(
         $bearer,
         ['name' => 'Clone edit flow ' . gmdate('YmdHis')]
@@ -211,7 +211,7 @@ test('Templates - duplicate published template and edit published yields a new d
  * 3. Expect refusal (**HTTP 422**), not success; JSON should carry a non-empty **`error`** when present.
  */
 test('Templates - deleting a published template outright is not allowed', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     [$apiBaseResolved, $uuid] = TemplatesApiHelper::createTemplateForFlow($bearer);
 
     ApiAuthHelper::apiRequest(

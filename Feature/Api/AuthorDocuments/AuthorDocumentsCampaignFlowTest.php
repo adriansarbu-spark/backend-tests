@@ -37,7 +37,7 @@ beforeAll(function () {
  */
 test('Author documents - owner can create a campaign and upload recipient rows', function () {
     $bearer = AuthorDocumentsApiHelper::bearerWithCompanyAdmin();
-    $signerEmail = defined('TEST_USER_2_EMAIL') ? TEST_USER_2_EMAIL : 'signer@example.com';
+    $signerEmail = isTestConfigDefined('TEST_USER_2_EMAIL') ? resolvedTestConfigValue('TEST_USER_2_EMAIL') : 'signer@example.com';
 
     $draft = AuthorDocumentsApiHelper::createDraftWithSignerParty($bearer, $signerEmail);
     $uuid = $draft['uuid'];
@@ -98,7 +98,7 @@ test('Author documents - someone else cannot open your draft document', function
     TeamApiHelper::assertUserTwoConfigOrSkip();
 
     $bearer1 = AuthorDocumentsApiHelper::bearerWithCompanyAdmin();
-    $bearer2 = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
 
     $draft = AuthorDocumentsApiHelper::createDraftWithSignerParty(
         $bearer1,

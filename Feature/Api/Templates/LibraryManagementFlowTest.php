@@ -46,7 +46,7 @@ beforeAll(function () {
  * 6. Delete; expect **`data.deleted`** true; opening the same id afterward returns **HTTP 404**.
  */
 test('Library - full lifecycle draft → publish → archive → delete', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $libraryBase = TemplatesApiHelper::libraryApiBase();
     $suffix = gmdate('YmdHis');
     $name = 'Mgmt flow library ' . $suffix;
@@ -138,7 +138,7 @@ test('Library - full lifecycle draft → publish → archive → delete', functi
  * 2. Expect **HTTP 422**; structured errors should use **`VALIDATION_ERROR`** on **`name`**, otherwise any non-empty **`error`**.
  */
 test('Library - create without name is rejected', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $libraryBase = TemplatesApiHelper::libraryApiBase();
 
     [$st, $json, $raw] = ApiAuthHelper::apiRequest(

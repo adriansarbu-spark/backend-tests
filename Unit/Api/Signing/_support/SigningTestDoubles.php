@@ -52,8 +52,26 @@ if (!class_exists('ModelCertificateCertificate', false)) {
     }
 }
 
+/**
+ * Skip production integrator-redirect resolution in signing unit tests.
+ *
+ * PublicAPIController::resolveIntegratorSigningRedirectUrl() require_onces
+ * csc_document_redirect.php, which pulls in the real CscKeycloakProvisioner.
+ * CSC unit tests may already have loaded a test double of that class in the
+ * same Pest process; re-including the production file would fatal.
+ */
+trait SigningSkipsIntegratorRedirect
+{
+    protected function resolveIntegratorSigningRedirectUrl(array $document, $sign_code, $status)
+    {
+        return null;
+    }
+}
+
 if (!class_exists(TestableControllerPublicAPIV1Signing::class)) {
     class TestableControllerPublicAPIV1Signing extends ControllerPublicAPIV1Signing {
+        use SigningSkipsIntegratorRedirect;
+
         public function getUploadRoot()
         {
             return parent::getUploadRoot();
@@ -78,6 +96,8 @@ if (!class_exists(TestableControllerPublicAPIV1Signing::class)) {
 
 if (!class_exists(TestableControllerPublicAPIV1SigningReject::class)) {
     class TestableControllerPublicAPIV1SigningReject extends ControllerPublicAPIV1Signing {
+        use SigningSkipsIntegratorRedirect;
+
         public function rejectDocument($sign_code)
         {
             return parent::rejectDocument($sign_code);
@@ -87,6 +107,8 @@ if (!class_exists(TestableControllerPublicAPIV1SigningReject::class)) {
 
 if (!class_exists(TestableControllerPublicAPIV1SigningDraft::class)) {
     class TestableControllerPublicAPIV1SigningDraft extends ControllerPublicAPIV1Signing {
+        use SigningSkipsIntegratorRedirect;
+
         // Invoked via reflection in draft tests.
     }
 }

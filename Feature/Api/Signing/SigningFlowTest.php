@@ -55,13 +55,13 @@ test('Signing - owner can create a document and complete their own signature', f
     SigningFlowHelper::setAnnotations($user1Bearer, $uuid, []);
     SigningFlowHelper::setSigners($user1Bearer, $uuid, [[
         'customer_role_id' => null,
-        'email' => TEST_USER_1_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_1_EMAIL'),
         'signing_order' => 1,
         'signing_type' => 'SIGNATURE',
         'send_email' => false,
     ]]);
-    $ownerSignCode = SigningFlowHelper::getSignCodeForEmail($user1Bearer, $uuid, TEST_USER_1_EMAIL);
-    [$signStatus, $signJson, $signRaw] = SigningFlowHelper::sign($user1Bearer, $ownerSignCode, TEST_USER_1_TOTP_SECRET);
+    $ownerSignCode = SigningFlowHelper::getSignCodeForEmail($user1Bearer, $uuid, resolvedTestConfigValue('TEST_USER_1_EMAIL'));
+    [$signStatus, $signJson, $signRaw] = SigningFlowHelper::sign($user1Bearer, $ownerSignCode, resolvedTestConfigValue('TEST_USER_1_TOTP_SECRET'));
 
     $signJsonText = is_array($signJson)
         ? (string)json_encode($signJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
@@ -95,13 +95,13 @@ test('Signing - someone else cannot sign with the owner’s signing link', funct
     );
     SigningFlowHelper::setSigners($user1Bearer, $uuid, [[
         'customer_role_id' => null,
-        'email' => TEST_USER_1_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_1_EMAIL'),
         'signing_order' => 1,
         'signing_type' => 'SIGNATURE',
         'send_email' => false,
     ]]);
-    $ownerSignCode = SigningFlowHelper::getSignCodeForEmail($user1Bearer, $uuid, TEST_USER_1_EMAIL);
-    [$signStatus, $signJson, $signRaw] = SigningFlowHelper::sign($user2Bearer, $ownerSignCode, TEST_USER_2_TOTP_SECRET);
+    $ownerSignCode = SigningFlowHelper::getSignCodeForEmail($user1Bearer, $uuid, resolvedTestConfigValue('TEST_USER_1_EMAIL'));
+    [$signStatus, $signJson, $signRaw] = SigningFlowHelper::sign($user2Bearer, $ownerSignCode, resolvedTestConfigValue('TEST_USER_2_TOTP_SECRET'));
 
     $debug = 'status=' . $signStatus . ' raw=' . substr($signRaw, 0, 700);
     expect($signStatus)->not->toBe(200, 'Other user should not sign with owner sign_code. ' . $debug);
@@ -137,14 +137,14 @@ test('Signing - invitee receives the document and can sign', function () {
         'y' => 40,
         'page' => 1,
         'type' => 'SIGNATURE',
-        'email' => TEST_USER_2_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
         'width' => 200,
         'height' => 80,
         'required' => true,
     ]]);
     SigningFlowHelper::setSigners($user1Bearer, $uuid, [[
         'customer_role_id' => null,
-        'email' => TEST_USER_2_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
         'signing_order' => 1,
         'signing_type' => 'SIGNATURE',
         'uses_prepaid_invite' => true,
@@ -159,7 +159,7 @@ test('Signing - invitee receives the document and can sign', function () {
     [$signStatus, $signJson, $signRaw] = SigningFlowHelper::signWithRetry(
         $user2Bearer,
         $user2SignCode,
-        TEST_USER_2_TOTP_SECRET
+        resolvedTestConfigValue('TEST_USER_2_TOTP_SECRET')
     );
 
     $signJsonText = is_array($signJson)
@@ -200,14 +200,14 @@ test('Signing - after signing, both sender and invitee can open the document', f
         'y' => 40,
         'page' => 1,
         'type' => 'SIGNATURE',
-        'email' => TEST_USER_2_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
         'width' => 200,
         'height' => 80,
         'required' => true,
     ]]);
     SigningFlowHelper::setSigners($user1Bearer, $uuid, [[
         'customer_role_id' => null,
-        'email' => TEST_USER_2_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
         'signing_order' => 1,
         'signing_type' => 'SIGNATURE',
         // 'send_email' => true,
@@ -221,7 +221,7 @@ test('Signing - after signing, both sender and invitee can open the document', f
     [$signStatus, $signJson, $signRaw] = SigningFlowHelper::signWithRetry(
         $user2Bearer,
         $user2SignCode,
-        TEST_USER_2_TOTP_SECRET
+        resolvedTestConfigValue('TEST_USER_2_TOTP_SECRET')
     );
     expect($signStatus)->toBe(200, 'Receiver sign failed. status=' . $signStatus . ' raw=' . substr($signRaw, 0, 700));
 
@@ -262,7 +262,7 @@ test('Signing - sender and invitee each sign in the configured order', function 
         'y' => 40,
         'page' => 1,
         'type' => 'SIGNATURE',
-        'email' => TEST_USER_1_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_1_EMAIL'),
         'width' => 200,
         'height' => 80,
         'required' => true,
@@ -271,20 +271,20 @@ test('Signing - sender and invitee each sign in the configured order', function 
         'y' => 40,
         'page' => 1,
         'type' => 'SIGNATURE',
-        'email' => TEST_USER_2_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
         'width' => 200,
         'height' => 80,
         'required' => true,
     ]]);
     SigningFlowHelper::setSigners($user1Bearer, $uuid, [[
         'customer_role_id' => null,
-        'email' => TEST_USER_1_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_1_EMAIL'),
         'signing_order' => 1,
         'signing_type' => 'SIGNATURE',
         'send_email' => false,
     ], [
         'customer_role_id' => null,
-        'email' => TEST_USER_2_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
         'signing_order' => 2,
         'signing_type' => 'SIGNATURE',
         'send_email' => true,
@@ -293,19 +293,19 @@ test('Signing - sender and invitee each sign in the configured order', function 
     SigningFlowHelper::sendDocument($user1Bearer, $uuid);
 
     // Sender signs first (order 1)
-    $user1SignCode = SigningFlowHelper::getSignCodeForEmail($user1Bearer, $uuid, TEST_USER_1_EMAIL);
-    [$u1SignStatus, , $u1SignRaw] = SigningFlowHelper::sign($user1Bearer, $user1SignCode, TEST_USER_1_TOTP_SECRET);
+    $user1SignCode = SigningFlowHelper::getSignCodeForEmail($user1Bearer, $uuid, resolvedTestConfigValue('TEST_USER_1_EMAIL'));
+    [$u1SignStatus, , $u1SignRaw] = SigningFlowHelper::sign($user1Bearer, $user1SignCode, resolvedTestConfigValue('TEST_USER_1_TOTP_SECRET'));
     expect($u1SignStatus)->toBe(200, 'Sender sign failed: ' . substr($u1SignRaw, 0, 700));
 
     // After sender signs, receiver should get invited and see a sign_code in their list
     $user2SignCode = SigningFlowHelper::waitForSignCodeForDocumentName($user2Bearer, $documentName);
-    [$u2SignStatus, , $u2SignRaw] = SigningFlowHelper::sign($user2Bearer, $user2SignCode, TEST_USER_2_TOTP_SECRET);
+    [$u2SignStatus, , $u2SignRaw] = SigningFlowHelper::sign($user2Bearer, $user2SignCode, resolvedTestConfigValue('TEST_USER_2_TOTP_SECRET'));
     expect($u2SignStatus)->toBe(200, 'Receiver sign failed: ' . substr($u2SignRaw, 0, 700));
 
     // Owner can still view the document at the end
     [$finalStatus, $finalJson, $finalRaw] = ApiAuthHelper::apiRequest(
         'GET',
-        API_URL . 'documents/' . rawurlencode($uuid),
+        resolveTestConfig('API_URL') . 'documents/' . rawurlencode($uuid),
         $user1Bearer
     );
     expect($finalStatus)->toBe(200, 'Owner should be able to view final doc. ' . substr($finalRaw, 0, 700));
@@ -329,7 +329,7 @@ test('Signing - sender and invitee each sign in the configured order', function 
  */
 test('Signing - uncertified invitee cannot finish a signature (expected)', function () {
     $user1Bearer = SigningFlowHelper::bearerForUser1();
-    $user3Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_3_EMAIL, TEST_USER_3_PASSWORD);
+    $user3Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_3_EMAIL'), resolvedTestConfigValue('TEST_USER_3_PASSWORD'));
 
     $documentName = 'sign-flow-user3-no-cert-' . gmdate('YmdHis') . '.pdf';
     $uuid = SigningFlowHelper::createDocument(
@@ -343,14 +343,14 @@ test('Signing - uncertified invitee cannot finish a signature (expected)', funct
         'y' => 40,
         'page' => 1,
         'type' => 'SIGNATURE',
-        'email' => TEST_USER_3_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_3_EMAIL'),
         'width' => 200,
         'height' => 80,
         'required' => true,
     ]]);
     SigningFlowHelper::setSigners($user1Bearer, $uuid, [[
         'customer_role_id' => null,
-        'email' => TEST_USER_3_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_3_EMAIL'),
         'signing_order' => 1,
         'signing_type' => 'SIGNATURE',
         'send_email' => false,
@@ -364,7 +364,7 @@ test('Signing - uncertified invitee cannot finish a signature (expected)', funct
     [$signStatus, $signJson, $signRaw] = SigningFlowHelper::signWithRetry(
         $user3Bearer,
         $user3SignCode,
-        TEST_USER_3_TOTP_SECRET
+        resolvedTestConfigValue('TEST_USER_3_TOTP_SECRET')
     );
 
     $signJsonText = is_array($signJson)
@@ -404,14 +404,14 @@ test('Signing - invitee can decline and both parties can still open the document
         'y' => 40,
         'page' => 1,
         'type' => 'SIGNATURE',
-        'email' => TEST_USER_2_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
         'width' => 200,
         'height' => 80,
         'required' => true,
     ]]);
     SigningFlowHelper::setSigners($user1Bearer, $uuid, [[
         'customer_role_id' => null,
-        'email' => TEST_USER_2_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
         'signing_order' => 1,
         'signing_type' => 'SIGNATURE',
         'send_email' => false,
@@ -425,7 +425,7 @@ test('Signing - invitee can decline and both parties can still open the document
     [$rejectStatus, $rejectJson, $rejectRaw] = SigningFlowHelper::reject(
         $user2Bearer,
         $user2SignCode,
-        TEST_USER_2_TOTP_SECRET
+        resolvedTestConfigValue('TEST_USER_2_TOTP_SECRET')
     );
     $rejectJsonText = is_array($rejectJson)
         ? (string)json_encode($rejectJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
@@ -435,7 +435,7 @@ test('Signing - invitee can decline and both parties can still open the document
     // Sender can view by UUID
     [$u1Status, $u1Json, $u1Raw] = ApiAuthHelper::apiRequest(
         'GET',
-        API_URL . 'documents/' . rawurlencode($uuid),
+        resolveTestConfig('API_URL') . 'documents/' . rawurlencode($uuid),
         $user1Bearer
     );
     expect($u1Status)->toBe(200, 'Sender should be able to view document after rejection. ' . substr($u1Raw, 0, 700));
@@ -472,14 +472,14 @@ test('Signing - after declining, the invitee cannot sign using the same link', f
         'y' => 40,
         'page' => 1,
         'type' => 'SIGNATURE',
-        'email' => TEST_USER_2_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
         'width' => 200,
         'height' => 80,
         'required' => true,
     ]]);
     SigningFlowHelper::setSigners($user1Bearer, $uuid, [[
         'customer_role_id' => null,
-        'email' => TEST_USER_2_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
         'signing_order' => 1,
         'signing_type' => 'SIGNATURE',
         'send_email' => false,
@@ -493,14 +493,14 @@ test('Signing - after declining, the invitee cannot sign using the same link', f
     [$rejectStatus, $rejectJson, $rejectRaw] = SigningFlowHelper::reject(
         $user2Bearer,
         $user2SignCode,
-        TEST_USER_2_TOTP_SECRET
+        resolvedTestConfigValue('TEST_USER_2_TOTP_SECRET')
     );
     expect($rejectStatus)->toBe(200, 'Receiver reject failed. status=' . $rejectStatus . ' raw=' . substr((string)$rejectRaw, 0, 700));
 
     [$signStatus, $signJson, $signRaw] = SigningFlowHelper::signWithRetry(
         $user2Bearer,
         $user2SignCode,
-        TEST_USER_2_TOTP_SECRET
+        resolvedTestConfigValue('TEST_USER_2_TOTP_SECRET')
     );
     $signJsonText = is_array($signJson)
         ? (string)json_encode($signJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
@@ -538,14 +538,14 @@ test('Signing - sender can withdraw the flow; both parties may still see the fil
         'y' => 40,
         'page' => 1,
         'type' => 'SIGNATURE',
-        'email' => TEST_USER_2_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
         'width' => 200,
         'height' => 80,
         'required' => true,
     ]]);
     SigningFlowHelper::setSigners($user1Bearer, $uuid, [[
         'customer_role_id' => null,
-        'email' => TEST_USER_2_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
         'signing_order' => 1,
         'signing_type' => 'SIGNATURE',
         'send_email' => false,
@@ -559,7 +559,7 @@ test('Signing - sender can withdraw the flow; both parties may still see the fil
     [$cancelStatus, $cancelJson, $cancelRaw] = SigningFlowHelper::cancelDocument(
         $user1Bearer,
         $uuid,
-        TEST_USER_1_TOTP_SECRET
+        resolvedTestConfigValue('TEST_USER_1_TOTP_SECRET')
     );
     $cancelJsonText = is_array($cancelJson)
         ? (string)json_encode($cancelJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
@@ -569,7 +569,7 @@ test('Signing - sender can withdraw the flow; both parties may still see the fil
     // Sender can view by UUID
     [$u1Status, $u1Json, $u1Raw] = ApiAuthHelper::apiRequest(
         'GET',
-        API_URL . 'documents/' . rawurlencode($uuid),
+        resolveTestConfig('API_URL') . 'documents/' . rawurlencode($uuid),
         $user1Bearer
     );
     expect($u1Status)->toBe(200, 'Sender should be able to view document after cancel. ' . substr($u1Raw, 0, 700));
@@ -620,14 +620,14 @@ test('Signing - after sender withdraws, the invitee cannot sign', function () {
         'y' => 40,
         'page' => 1,
         'type' => 'SIGNATURE',
-        'email' => TEST_USER_2_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
         'width' => 200,
         'height' => 80,
         'required' => true,
     ]]);
     SigningFlowHelper::setSigners($user1Bearer, $uuid, [[
         'customer_role_id' => null,
-        'email' => TEST_USER_2_EMAIL,
+        'email' => resolvedTestConfigValue('TEST_USER_2_EMAIL'),
         'signing_order' => 1,
         'signing_type' => 'SIGNATURE',
         'send_email' => false,
@@ -641,14 +641,14 @@ test('Signing - after sender withdraws, the invitee cannot sign', function () {
     [$cancelStatus, $cancelJson, $cancelRaw] = SigningFlowHelper::cancelDocument(
         $user1Bearer,
         $uuid,
-        TEST_USER_1_TOTP_SECRET
+        resolvedTestConfigValue('TEST_USER_1_TOTP_SECRET')
     );
     expect($cancelStatus)->toBe(200, 'Sender cancel failed. status=' . $cancelStatus . ' raw=' . substr((string)$cancelRaw, 0, 700));
 
     [$signStatus, $signJson, $signRaw] = SigningFlowHelper::signWithRetry(
         $user2Bearer,
         $user2SignCode,
-        TEST_USER_2_TOTP_SECRET
+        resolvedTestConfigValue('TEST_USER_2_TOTP_SECRET')
     );
     $signJsonText = is_array($signJson)
         ? (string)json_encode($signJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
@@ -675,7 +675,7 @@ test('Signing - sender cannot decline on behalf of the invitee using their signi
     [$rejectStatus, $rejectJson, $rejectRaw] = SigningFlowHelper::reject(
         $user1Bearer,
         $user2SignCode,
-        TEST_USER_1_TOTP_SECRET
+        resolvedTestConfigValue('TEST_USER_1_TOTP_SECRET')
     );
 
     $rejectJsonText = is_array($rejectJson)
@@ -704,7 +704,7 @@ test('Signing - invitee cannot cancel the sender’s document', function () {
     [$cancelStatus, $cancelJson, $cancelRaw] = SigningFlowHelper::cancelDocument(
         $user2Bearer,
         $uuid,
-        TEST_USER_2_TOTP_SECRET
+        resolvedTestConfigValue('TEST_USER_2_TOTP_SECRET')
     );
 
     $cancelJsonText = is_array($cancelJson)
@@ -728,13 +728,13 @@ test('Signing - sender cannot decline after the invitee has already signed', fun
     $user1Bearer = SigningFlowHelper::bearerForUser1();
     $user2Bearer = SigningFlowHelper::bearerForUser2();
 
-    [$signStatus, , $signRaw] = SigningFlowHelper::signWithRetry($user2Bearer, $user2SignCode, TEST_USER_2_TOTP_SECRET);
+    [$signStatus, , $signRaw] = SigningFlowHelper::signWithRetry($user2Bearer, $user2SignCode, resolvedTestConfigValue('TEST_USER_2_TOTP_SECRET'));
     expect($signStatus)->toBe(200, 'Precondition failed: receiver should sign. raw=' . substr((string)$signRaw, 0, 700));
 
     [$rejectStatus, $rejectJson, $rejectRaw] = SigningFlowHelper::reject(
         $user1Bearer,
         $user2SignCode,
-        TEST_USER_1_TOTP_SECRET
+        resolvedTestConfigValue('TEST_USER_1_TOTP_SECRET')
     );
 
     $rejectJsonText = is_array($rejectJson)
@@ -757,13 +757,13 @@ test('Signing - invitee cannot cancel after they have signed', function () {
     [$uuid, $documentName, $user2SignCode] = SigningFlowHelper::sentDocFromUser1ToUser2();
     $user2Bearer = SigningFlowHelper::bearerForUser2();
 
-    [$signStatus, , $signRaw] = SigningFlowHelper::signWithRetry($user2Bearer, $user2SignCode, TEST_USER_2_TOTP_SECRET);
+    [$signStatus, , $signRaw] = SigningFlowHelper::signWithRetry($user2Bearer, $user2SignCode, resolvedTestConfigValue('TEST_USER_2_TOTP_SECRET'));
     expect($signStatus)->toBe(200, 'Precondition failed: receiver should sign. raw=' . substr((string)$signRaw, 0, 700));
 
     [$cancelStatus, $cancelJson, $cancelRaw] = SigningFlowHelper::cancelDocument(
         $user2Bearer,
         $uuid,
-        TEST_USER_2_TOTP_SECRET
+        resolvedTestConfigValue('TEST_USER_2_TOTP_SECRET')
     );
 
     $cancelJsonText = is_array($cancelJson)

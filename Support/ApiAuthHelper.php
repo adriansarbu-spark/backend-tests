@@ -67,15 +67,15 @@ final class ApiAuthHelper
      */
     public static function bearerTokenFor(string $username, string $password): string
     {
-        $response = self::guzzleRequest('POST', AUTH_URL, [
+        $response = self::guzzleRequest('POST', resolveTestConfig('AUTH_URL'), [
             'headers' => [
                 'Accept' => 'application/json',
                 'Content-Type' => 'application/x-www-form-urlencoded',
             ],
             'form_params' => [
                 'grant_type' => 'password',
-                'client_id' => CLIENT_ID,
-                'client_secret' => CLIENT_SECRET,
+                'client_id' => resolveTestConfig('CLIENT_ID'),
+                'client_secret' => resolveTestConfig('CLIENT_SECRET'),
                 'username' => $username,
                 'password' => $password,
                 'scope' => 'openid profile email',

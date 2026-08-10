@@ -24,7 +24,7 @@ if (SKIP_INTEGRATION_TESTS) {
  * File guard (runs once before any scenario in this file):
  *
  * Prerequisites:
- * - Integration tests are on; Keycloak plus **`TEST_USER_1_*`**, **`TEST_USER_2_*`**, and **`TEST_USER_1_TOTP_SECRET`** for revoke probes.
+ * - Integration tests are on; Keycloak plus **`TEST_USER_1_*`**, **`TEST_USER_2_*`**, and **`resolvedTestConfigValue('TEST_USER_1_TOTP_SECRET')`** for revoke probes.
  *
  * Steps:
  * 1. Confirm required constants are present; if not, skip the whole file.
@@ -64,7 +64,7 @@ $pickUser1ActiveRepresentativeUuids = static function (string $bearer1): array {
 
 /**
  * Prerequisites:
- * - User A is company **admin** with TOTP enrolled (`TEST_USER_1_TOTP_SECRET`).
+ * - User A is company **admin** with TOTP enrolled (`resolvedTestConfigValue('TEST_USER_1_TOTP_SECRET')`).
  *
  * Steps:
  * 1. **POST** `/publicapi/v1/company/representatives/{representative_uuid}/revoke` with a random UUID and valid **`totp_code`**.
@@ -73,7 +73,7 @@ $pickUser1ActiveRepresentativeUuids = static function (string $bearer1): array {
 test('Company representatives - admin revoke with unknown UUID returns 404', function () {
     $bearer = CompanyRepresentativeApiHelper::bearerTokenForUser1AsCompanyRepresentative();
     $unknown = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
-    $totp = ApiAuthHelper::getOtpFromTotpSecret(TEST_USER_1_TOTP_SECRET);
+    $totp = ApiAuthHelper::getOtpFromTotpSecret(resolvedTestConfigValue('TEST_USER_1_TOTP_SECRET'));
 
     [$status, $json, $raw] = CompanyRepresentativeApiHelper::postJson(
         CompanyRepresentativeApiHelper::representativesRevokeUrl($unknown),
@@ -117,13 +117,13 @@ test('Company representatives - revoke without TOTP when enrolled is rejected', 
  * - User B signed in (`TEST_USER_2_*`); user A has at least one **active** **`representative_uuid`** in **GET** list.
  *
  * Steps:
- * 1. **POST** `/publicapi/v1/company/representatives/{representative_uuid}/revoke` as user B targeting user A’s active **`representative_uuid`**, including user B’s **`totp_code`** when **`TEST_USER_2_TOTP_SECRET`** is configured so admin callers are fully exercised.
+ * 1. **POST** `/publicapi/v1/company/representatives/{representative_uuid}/revoke` as user B targeting user A’s active **`representative_uuid`**, including user B’s **`totp_code`** when **`resolvedTestConfigValue('TEST_USER_2_TOTP_SECRET')`** is configured so admin callers are fully exercised.
  * 2. Expect **not HTTP 200** — **HTTP 403** **`admin_role_required`** when B is not admin, or **HTTP 404** **`representative_not_found`** when B is admin on another company (row not in B’s company).
  * 3. If the server incorrectly returns **HTTP 200**, mark the test incomplete as a possible security regression.
  */
 test('Company representatives - outsider cannot revoke another company’s representative by UUID', function () use ($pickUser1ActiveRepresentativeUuids) {
     $bearer1 = CompanyRepresentativeApiHelper::bearerTokenForUser1AsCompanyRepresentative();
-    $bearer2 = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
 
     $uuids = $pickUser1ActiveRepresentativeUuids($bearer1);
     if ($uuids === []) {
@@ -134,8 +134,8 @@ test('Company representatives - outsider cannot revoke another company’s repre
     $body = [
         'reason' => 'integration — cross-tenant revoke must fail',
     ];
-    if (defined('TEST_USER_2_TOTP_SECRET') && is_string(TEST_USER_2_TOTP_SECRET) && trim(TEST_USER_2_TOTP_SECRET) !== '') {
-        $body['totp_code'] = ApiAuthHelper::getOtpFromTotpSecret(TEST_USER_2_TOTP_SECRET);
+    if (isTestConfigDefined('TEST_USER_2_TOTP_SECRET') && resolvedTestConfigValue('TEST_USER_2_TOTP_SECRET') !== '') {
+        $body['totp_code'] = ApiAuthHelper::getOtpFromTotpSecret(resolvedTestConfigValue('TEST_USER_2_TOTP_SECRET'));
     }
 
     [$status, $json, $raw] = CompanyRepresentativeApiHelper::postJson(

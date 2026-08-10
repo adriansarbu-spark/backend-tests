@@ -151,7 +151,20 @@ Use this decision rule:
 
 ---
 
-## 12. Scenario documentation on every new Pest test (required)
+## 12. Feature tests arrange state only through public endpoints (required)
+
+Feature/Integration tests under `tests/Feature` must **not** insert, update, or delete rows through direct database access (raw SQL, OpenCart `DB`, PDO, fixture helpers that open `DIR_CONFIG_NOACCESS/db.php`, etc.).
+
+1. **Arrange via public HTTP APIs** - create, assign, release, or otherwise set up state using the same public endpoints the product exposes (e.g. `BillingApiHelper::post('billing/seats/assign', …)`), plus auth helpers that call real login/active-role routes.
+2. **Pre-seeded config is allowed** - dedicated UUIDs in `tests_config.php` (e.g. `BILLING_TEST_FREE_SEAT_SLOT_UUID`) may identify fixtures that already exist in the environment; tests still mutate them only through public endpoints.
+3. **Prefer API cleanup** - when a public release/delete endpoint exists, restore fixtures in `finally` (seat release is the billing pattern). When no public cleanup exists, skip if the required pre-seeded state is missing rather than inventing rows in SQL.
+4. **Unit tests are different** - `tests/Unit` may use doubles/fakes; they still must not touch the real application database.
+
+Helpers such as `BillingFixtureHelper` may resolve config keys and skip reasons, but must not open a DB connection for Feature setup.
+
+---
+
+## 13. Scenario documentation on every new Pest test (required)
 
 For **every** new `test('…', function () {` in Pest files under `tests/` (especially `tests/Feature`), add a **PHPDoc block immediately above** that `test(` call. Only whitespace may appear between the closing `*/` and `test(` - otherwise the admin Test Runner will not attach the text to the right test.
 
@@ -183,7 +196,7 @@ test('Documents - short behavior in everyday language', function () {
 
 For **documents** flows specifically, prefer titles like `Documents - …` (see the “Documents: reader-friendly descriptions” section above).
 
-### Rules
+### Rules (scenario documentation)
 
 1. **One docblock per test** - the block must be the **last** `/** … */` before that `test(` (if you stack comments, only the one directly above `test(` is used).
 2. **Keep Steps aligned with the code** - update the doc when the test changes.

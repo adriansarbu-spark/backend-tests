@@ -53,6 +53,7 @@ test('addLibraryToMyTemplates creates user template and copies parties and smart
                 'name'          => 'Lib name',
                 'description'   => 'Lib desc',
                 'category_code' => 'contracts',
+                'language_id'   => 1,
             ];
         }
         public function getLatestPublishedVersion(string $uuid) {
@@ -112,6 +113,7 @@ test('addLibraryToMyTemplates creates user template and copies parties and smart
     expect($tpl['name'] ?? null)->toBe('Lib name');
     expect($tpl['description'] ?? null)->toBe('Ver desc');
     expect($tpl['category_code'] ?? null)->toBe('contracts');
+    expect($tpl['language_id'] ?? null)->toBe(1);
     expect($tpl['visibility'] ?? null)->toBe('private');
     expect($tpl['status'] ?? null)->toBe('draft');
 
@@ -123,7 +125,7 @@ test('addLibraryToMyTemplates creates user template and copies parties and smart
 
     // Smartfields copied
     $smartfields = $this->controller->model_esign_tpl_template->capturedSmartfields ?? [];
-    expect($smartfields[0]['field_key'] ?? null)->toBe('field1');
+    expect($smartfields[0]['field_key'] ?? null)->toBe('field1'); 
     expect($smartfields[0]['type'] ?? null)->toBe('text');
 }
 );

@@ -46,3 +46,29 @@ test('s3 log monitor run store records insert queries on fake db without persist
 	expect($sql)->toContain('INSERT INTO `s3_log_monitor_checks`');
 	expect($sql)->toContain('UPDATE `s3_log_monitor_runs`');
 });
+
+test('s3 log monitor run store persists warning check and successful-with-warnings run', function () {
+	$db = new S3LogMonitorFakeDb();
+	$store = new S3LogMonitorRunStore(new S3LogMonitorFakeRegistry($db));
+	$rule = new S3LogMonitorRule(array(
+		's3_log_monitor_folder_id' => 6,
+		'base_path'                => 'qtsp-logs/dr/web/web',
+	));
+	$row = new S3LogMonitorResultRow($rule, 'warning', 'No logs found');
+
+	$runId = $store->startRun('ops@example.com');
+	$store->insertCheck($runId, $row, '2026-07-21 08:00:00');
+	$store->finishRun($runId, array(
+		'run_status'       => 'pass_with_warnings',
+		'folders_checked'  => 1,
+		'folders_passed'   => 0,
+		'folders_warnings' => 1,
+		'folders_failed'   => 0,
+		'folders_errors'   => 0,
+	), true);
+
+	$sql = implode("\n", $db->queries);
+	expect($sql)->toContain("`status` = 'warning'");
+	expect($sql)->toContain("`status` = 'pass_with_warnings'");
+	expect($sql)->toContain("`warnings` = '1'");
+});

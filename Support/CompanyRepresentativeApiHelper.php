@@ -14,7 +14,7 @@ final class CompanyRepresentativeApiHelper
     /** Hyphen path is normalized by the router to `representative_requests`. */
     public static function representativeRequestsUrl(): string
     {
-        return API_URL . 'company/representative-requests';
+        return resolveTestConfig('API_URL') . 'company/representative-requests';
     }
 
     /**
@@ -42,56 +42,43 @@ final class CompanyRepresentativeApiHelper
 
     public static function representativesUrl(): string
     {
-        return API_URL . 'company/representatives';
+        return resolveTestConfig('API_URL') . 'company/representatives';
     }
 
     public static function representativesEligibilityUrl(): string
     {
-        return API_URL . 'company/representatives/eligibility';
+        return resolveTestConfig('API_URL') . 'company/representatives/eligibility';
     }
 
     public static function representativesRevokeUrl(string $representativeUuid): string
     {
-        return API_URL . 'company/representatives/' . rawurlencode($representativeUuid) . '/revoke';
+        return resolveTestConfig('API_URL') . 'company/representatives/' . rawurlencode($representativeUuid) . '/revoke';
     }
 
     public static function assertPrimaryUserConfigOrSkip(): void
     {
-        $required = [
-            'AUTH_URL' => defined('AUTH_URL') ? AUTH_URL : '',
-            'CLIENT_ID' => defined('CLIENT_ID') ? CLIENT_ID : '',
-            'CLIENT_SECRET' => defined('CLIENT_SECRET') ? CLIENT_SECRET : '',
-            'TEST_USER_1_EMAIL' => defined('TEST_USER_1_EMAIL') ? TEST_USER_1_EMAIL : '',
-            'TEST_USER_1_PASSWORD' => defined('TEST_USER_1_PASSWORD') ? TEST_USER_1_PASSWORD : '',
-        ];
-        foreach ($required as $key => $value) {
-            if (!is_string($value) || trim($value) === '') {
-                test()->markTestSkipped("Missing required test config constant: {$key}");
-            }
-        }
+        assertTestConfigKeysOrSkip([
+            'AUTH_URL',
+            'CLIENT_ID',
+            'CLIENT_SECRET',
+            'TEST_USER_1_EMAIL',
+            'TEST_USER_1_PASSWORD',
+        ]);
     }
 
     public static function assertTwoUsersConfigOrSkip(): void
     {
         self::assertPrimaryUserConfigOrSkip();
-        $required = [
-            'TEST_USER_2_EMAIL' => defined('TEST_USER_2_EMAIL') ? TEST_USER_2_EMAIL : '',
-            'TEST_USER_2_PASSWORD' => defined('TEST_USER_2_PASSWORD') ? TEST_USER_2_PASSWORD : '',
-        ];
-        foreach ($required as $key => $value) {
-            if (!is_string($value) || trim($value) === '') {
-                test()->markTestSkipped("Missing required test config constant: {$key}");
-            }
-        }
+        assertTestConfigKeysOrSkip([
+            'TEST_USER_2_EMAIL',
+            'TEST_USER_2_PASSWORD',
+        ]);
     }
 
     public static function assertTotpUser1ConfigOrSkip(): void
     {
         self::assertPrimaryUserConfigOrSkip();
-        $totp = defined('TEST_USER_1_TOTP_SECRET') ? TEST_USER_1_TOTP_SECRET : '';
-        if (!is_string($totp) || trim($totp) === '') {
-            test()->markTestSkipped('Missing required test config constant: TEST_USER_1_TOTP_SECRET');
-        }
+        assertTestConfigKeysOrSkip(['TEST_USER_1_TOTP_SECRET']);
     }
 
     public static function assertRepresentativeCompanyConfigOrSkip(): void
@@ -106,7 +93,7 @@ final class CompanyRepresentativeApiHelper
     public static function bearerTokenForUser1AsCompanyRepresentative(): string
     {
         self::assertRepresentativeCompanyConfigOrSkip();
-        $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+        $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
         AccountCompaniesApiHelper::switchUser1ToCompanyRepresentativeRole($bearer);
 
         return $bearer;

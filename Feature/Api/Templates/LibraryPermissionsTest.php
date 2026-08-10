@@ -42,7 +42,7 @@ beforeAll(function () {
  * 2. Expect **HTTP 405**; JSON **`error`** non-empty or raw body non-empty.
  */
 test('Library - PATCH on the library collection is not supported', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $libraryBase = TemplatesApiHelper::libraryApiBase();
 
     [$st, $json, $raw] = ApiAuthHelper::apiRequest('PATCH', $libraryBase, $bearer);
@@ -63,7 +63,7 @@ test('Library - PATCH on the library collection is not supported', function () {
  * 2. Expect **not found** (**HTTP 404**); JSON **`error`** non-empty when present.
  */
 test('Library - delete with an unknown id returns not found', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $libraryBase = TemplatesApiHelper::libraryApiBase();
     $fake = '00000000-0000-4000-8000-000000000088';
 
@@ -91,7 +91,7 @@ test('Library - delete with an unknown id returns not found', function () {
  * 2. Expect **HTTP 404**; **`error`** non-empty when JSON is returned.
  */
 test('Library - publish with an unknown id returns not found', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $libraryBase = TemplatesApiHelper::libraryApiBase();
     $fake = '00000000-0000-4000-8000-000000000077';
 
@@ -119,7 +119,7 @@ test('Library - publish with an unknown id returns not found', function () {
  * 2. Expect **HTTP 422**; structured responses should use **`VALIDATION_ERROR`** on **`language_id`**, otherwise any non-empty **`error`**.
  */
 test('Library - create without language is rejected', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $libraryBase = TemplatesApiHelper::libraryApiBase();
 
     [$st, $json] = ApiAuthHelper::apiRequest(

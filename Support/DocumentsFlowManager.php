@@ -20,7 +20,7 @@ final class DocumentsFlowManager
         private readonly string $user2Password,
         ?string $apiBase = null
     ) {
-        $this->apiBase = $apiBase ?? (API_URL . 'documents');
+        $this->apiBase = $apiBase ?? (resolveTestConfig('API_URL') . 'documents');
     }
 
     /**
@@ -33,10 +33,10 @@ final class DocumentsFlowManager
         self::assertRequiredConfigOrSkip();
 
         return new self(
-            TEST_USER_1_EMAIL,
-            TEST_USER_1_PASSWORD,
-            TEST_USER_2_EMAIL,
-            TEST_USER_2_PASSWORD
+            resolvedTestConfigValue('TEST_USER_1_EMAIL'),
+            resolvedTestConfigValue('TEST_USER_1_PASSWORD'),
+            resolvedTestConfigValue('TEST_USER_2_EMAIL'),
+            resolvedTestConfigValue('TEST_USER_2_PASSWORD')
         );
     }
 
@@ -63,7 +63,7 @@ final class DocumentsFlowManager
     }
 
     /**
-     * API base used for document requests (usually API_URL . 'documents').
+     * API base used for document requests (usually resolveTestConfig('API_URL') . 'documents').
      */
     public function getApiBase(): string
     {
@@ -113,20 +113,14 @@ final class DocumentsFlowManager
      */
     private static function assertRequiredConfigOrSkip(): void
     {
-        $required = [
-            'AUTH_URL' => defined('AUTH_URL') ? AUTH_URL : '',
-            'CLIENT_ID' => defined('CLIENT_ID') ? CLIENT_ID : '',
-            'CLIENT_SECRET' => defined('CLIENT_SECRET') ? CLIENT_SECRET : '',
-            'TEST_USER_1_EMAIL' => defined('TEST_USER_1_EMAIL') ? TEST_USER_1_EMAIL : '',
-            'TEST_USER_1_PASSWORD' => defined('TEST_USER_1_PASSWORD') ? TEST_USER_1_PASSWORD : '',
-            'TEST_USER_2_EMAIL' => defined('TEST_USER_2_EMAIL') ? TEST_USER_2_EMAIL : '',
-            'TEST_USER_2_PASSWORD' => defined('TEST_USER_2_PASSWORD') ? TEST_USER_2_PASSWORD : '',
-        ];
-
-        foreach ($required as $key => $value) {
-            if (!is_string($value) || trim($value) === '') {
-                test()->markTestSkipped("Missing required test config constant: {$key}");
-            }
-        }
+        assertTestConfigKeysOrSkip([
+            'AUTH_URL',
+            'CLIENT_ID',
+            'CLIENT_SECRET',
+            'TEST_USER_1_EMAIL',
+            'TEST_USER_1_PASSWORD',
+            'TEST_USER_2_EMAIL',
+            'TEST_USER_2_PASSWORD',
+        ]);
     }
 }

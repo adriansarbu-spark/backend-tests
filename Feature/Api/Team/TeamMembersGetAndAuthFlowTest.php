@@ -63,7 +63,7 @@ test('Team members - listing without a token is refused', function () {
  * 3. For each member row, assert **`role_uuid`**, **`role_code`**, **`email`**, **`member_status`**, and nested **`representative`** with a **`status`** key (UUID identity on the wire; no internal numeric ids).
  */
 test('Team members - signed-in user can list active members with role UUIDs', function () {
-    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     [$status, $json, $raw] = TeamApiHelper::get(
         TeamApiHelper::membersUrl() . '?member_status=active&page=1&per_page=50',
         $bearer
@@ -101,7 +101,7 @@ test('Team members - signed-in user can list active members with role UUIDs', fu
  * 2. Expect **HTTP 405** and **`method_not_allowed`** when JSON carries **`error`**.
  */
 test('Team members - unsupported HTTP method on list route returns 405', function () {
-    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     [$status, $json, $raw] = ApiAuthHelper::apiRequest('PUT', TeamApiHelper::membersUrl(), $bearer);
     $debug = 'status=' . $status . ' raw=' . substr($raw, 0, 600);
 
@@ -120,7 +120,7 @@ test('Team members - unsupported HTTP method on list route returns 405', functio
  * 2. Expect **HTTP 405** so the terminate action cannot be triggered via a browser-style **GET** alone.
  */
 test('Team members - terminate URL with GET returns 405', function () {
-    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $dummyUuid = '00000000-0000-4000-a000-000000000001';
     [$status, , $raw] = TeamApiHelper::get(TeamApiHelper::membersTerminateUrl($dummyUuid), $bearer);
     $debug = 'status=' . $status . ' raw=' . substr($raw, 0, 600);

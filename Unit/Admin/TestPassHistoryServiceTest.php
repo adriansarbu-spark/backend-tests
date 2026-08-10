@@ -5,6 +5,46 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../tests_config.php';
 require_once DIR_SYSTEM . 'library/test/TestPassHistoryService.php';
 
+test('computePassPercentage excludes skipped tests from the denominator', function () {
+    expect(TestPassHistoryService::computePassPercentage(8, 2, 5))->toBe(80.0);
+    expect(TestPassHistoryService::computePassPercentage(9, 1, 0))->toBe(90.0);
+    expect(TestPassHistoryService::computePassPercentage(0, 0, 10))->toBe(0.0);
+});
+
+test('filterHistoryForDashboardExport keeps finalized all-suite runs only', function () {
+    $service = new TestPassHistoryService(sys_get_temp_dir() . '/unused-' . uniqid('', true) . '.json');
+    $history = array(
+        array('suite' => 'ALL', 'status' => 'passed', 'finished_at' => '2026-05-06T16:00:00Z'),
+        array('suite_type' => 'all', 'status' => 'failed', 'finished_at' => '2026-05-06T17:00:00Z'),
+        array('suite' => 'UNIT', 'status' => 'passed', 'finished_at' => '2026-05-06T18:00:00Z'),
+        array('suite' => 'ALL', 'status' => 'running', 'finished_at' => '2026-05-06T19:00:00Z'),
+    );
+
+    $filtered = $service->filterHistoryForDashboardExport($history);
+
+    expect($filtered)->toHaveCount(2);
+    expect(array_column($filtered, 'status'))->toBe(array('passed', 'failed'));
+});
+
+test('test pass history service stores skipped-aware pass percentage', function () {
+    $dir = sys_get_temp_dir() . '/test-pass-history-' . uniqid('', true);
+    $path = $dir . '/test-pass-history.json';
+    $service = new TestPassHistoryService($path);
+
+    $warning = '';
+    $history = $service->upsertFromSummary([
+        'run_id' => 'run-skipped',
+        'finished_at' => '2026-05-06T16:10:00Z',
+        'suite_type' => 'all',
+        'summary_json' => ['passed' => 8, 'failed' => 2, 'skipped' => 5],
+    ], $warning);
+
+    expect($warning)->toBe('');
+    expect($history[0]['pass_percentage'] ?? null)->toBe(80.0);
+    expect($history[0]['skipped'] ?? null)->toBe(5);
+    expect($history[0]['suite_type'] ?? null)->toBe('all');
+});
+
 test('test pass history service creates history file and first entry', function () {
     $dir = sys_get_temp_dir() . '/test-pass-history-' . uniqid('', true);
     $path = $dir . '/test-pass-history.json';
@@ -23,6 +63,7 @@ test('test pass history service creates history file and first entry', function 
     expect($history)->toHaveCount(1);
     expect($history[0]['timestamp'] ?? null)->toBe('2026-05-06T14:30:01Z');
     expect($history[0]['pass_percentage'] ?? null)->toBe(90.0);
+    expect($history[0]['skipped'] ?? null)->toBe(0);
     expect($history[0]['total'] ?? null)->toBe(10);
     expect($history[0]['passed'] ?? null)->toBe(9);
     expect($history[0]['failed'] ?? null)->toBe(1);

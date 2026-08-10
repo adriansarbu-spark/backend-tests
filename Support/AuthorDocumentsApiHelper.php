@@ -14,7 +14,7 @@ final class AuthorDocumentsApiHelper
 
     public static function apiBase(): string
     {
-        return API_URL . 'esign/author-documents';
+        return resolveTestConfig('API_URL') . 'esign/author-documents';
     }
 
     public static function documentUrl(string $uuid): string

@@ -14,7 +14,7 @@ final class TemplatesApiHelper
      */
     public static function apiBase(): string
     {
-        return API_URL . 'esign/tpl/templates';
+        return resolveTestConfig('API_URL') . 'esign/tpl/templates';
     }
 
     /**
@@ -24,7 +24,7 @@ final class TemplatesApiHelper
      */
     public static function libraryApiBase(): string
     {
-        return API_URL . 'esign/tpl/library';
+        return resolveTestConfig('API_URL') . 'esign/tpl/library';
     }
 
     /**
@@ -43,22 +43,16 @@ final class TemplatesApiHelper
      */
     public static function assertRequiredConfigOrSkip(): void
     {
-        $required = [
-            'AUTH_URL' => defined('AUTH_URL') ? AUTH_URL : '',
-            'CLIENT_ID' => defined('CLIENT_ID') ? CLIENT_ID : '',
-            'CLIENT_SECRET' => defined('CLIENT_SECRET') ? CLIENT_SECRET : '',
-            'TEST_USER_1_EMAIL' => defined('TEST_USER_1_EMAIL') ? TEST_USER_1_EMAIL : '',
-            'TEST_USER_1_PASSWORD' => defined('TEST_USER_1_PASSWORD') ? TEST_USER_1_PASSWORD : '',
-            'TEST_USER_2_EMAIL' => defined('TEST_USER_2_EMAIL') ? TEST_USER_2_EMAIL : '',
-            'TEST_USER_2_PASSWORD' => defined('TEST_USER_2_PASSWORD') ? TEST_USER_2_PASSWORD : '',
-            'TEST_USER_1_PERSONAL_ROLE_UUID' => defined('TEST_USER_1_PERSONAL_ROLE_UUID') ? TEST_USER_1_PERSONAL_ROLE_UUID : '',
-        ];
-
-        foreach ($required as $key => $value) {
-            if (!is_string($value) || trim($value) === '') {
-                test()->markTestSkipped("Missing required test config constant: {$key}");
-            }
-        }
+        assertTestConfigKeysOrSkip([
+            'AUTH_URL',
+            'CLIENT_ID',
+            'CLIENT_SECRET',
+            'TEST_USER_1_EMAIL',
+            'TEST_USER_1_PASSWORD',
+            'TEST_USER_2_EMAIL',
+            'TEST_USER_2_PASSWORD',
+            'TEST_USER_1_PERSONAL_ROLE_UUID',
+        ]);
     }
 
     /**

@@ -42,8 +42,8 @@ beforeAll(function () {
  * 2. User B tries to open it by id; expect **forbidden** (**HTTP 403**) and a non-empty **`error`** when JSON is returned.
  */
 test('Templates - someone else cannot open your private template', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $user1Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
+    $user2Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
 
     [$apiBase, $templateUuid] = TemplatesApiHelper::createTemplateForFlow($user1Bearer, [
         'visibility' => 'private',
@@ -71,8 +71,8 @@ test('Templates - someone else cannot open your private template', function () {
  * 2. Expect **HTTP 403** and a non-empty **`error`** when JSON is returned (B must not remove A’s row).
  */
 test('Templates - someone else cannot delete your private template', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $user1Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
+    $user2Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
 
     [$apiBase, $templateUuid] = TemplatesApiHelper::createTemplateForFlow($user1Bearer, [
         'visibility' => 'private',
@@ -100,8 +100,8 @@ test('Templates - someone else cannot delete your private template', function ()
  * 2. User B tries to add a version with a body; expect **HTTP 403** and non-empty **`error`**.
  */
 test('Templates - someone else cannot list or add versions on your private template', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $user1Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
+    $user2Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
 
     [$apiBase, $templateUuid] = TemplatesApiHelper::createTemplateForFlow($user1Bearer, [
         'visibility' => 'private',
@@ -143,8 +143,8 @@ test('Templates - someone else cannot list or add versions on your private templ
  * 2. User B tries to duplicate A’s template; expect **HTTP 403** and non-empty **`error`**.
  */
 test('Templates - someone else cannot publish or duplicate your private template', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $user1Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
+    $user2Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
 
     [$apiBase, $templateUuid] = TemplatesApiHelper::createTemplateForFlow($user1Bearer, [
         'visibility' => 'private',
@@ -181,8 +181,8 @@ test('Templates - someone else cannot publish or duplicate your private template
  * 2. User B scrolls their own template list; B’s rows must **not** include A’s id (tenant isolation).
  */
 test('Templates - another account’s list does not leak your private template id', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $user1Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
+    $user2Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
 
     $suffix = gmdate('YmdHis');
     [$apiBase, $uuid] = TemplatesApiHelper::createTemplateForFlow(
@@ -218,7 +218,7 @@ test('Templates - another account’s list does not leak your private template i
  * 2. Expect **method not allowed** (**HTTP 405**); JSON **`error`** non-empty or raw body non-empty.
  */
 test('Templates - PATCH on the template collection is not supported', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $apiBase = TemplatesApiHelper::apiBase();
 
     [$status, $json, $raw] = ApiAuthHelper::apiRequest('PATCH', $apiBase, $bearer);

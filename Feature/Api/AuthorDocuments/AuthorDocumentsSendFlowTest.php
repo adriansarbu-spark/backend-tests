@@ -30,7 +30,7 @@ beforeAll(function () {
  */
 test('Author documents - owner can send a prepared campaign and get signing documents', function () {
     $bearer = AuthorDocumentsApiHelper::bearerWithCompanyAdmin();
-    $signerEmail = defined('TEST_USER_2_EMAIL') ? TEST_USER_2_EMAIL : 'signer@example.com';
+    $signerEmail = isTestConfigDefined('TEST_USER_2_EMAIL') ? resolvedTestConfigValue('TEST_USER_2_EMAIL') : 'signer@example.com';
 
     $draft = AuthorDocumentsApiHelper::createDraftWithSignerParty($bearer, $signerEmail);
     $uuid = $draft['uuid'];

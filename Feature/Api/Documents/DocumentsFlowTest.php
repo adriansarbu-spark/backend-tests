@@ -111,7 +111,7 @@ test('Documents — someone else cannot open your document', function () {
  * 5. Verify the document appears in company list and does not appear in personal list.
  */
 test('Documents — company ownership is saved and listed under company envelopes', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $user1Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     AccountCompaniesApiHelper::switchUser1ToCompanyRepresentativeRole($user1Bearer);
 
     [$apiBase, $uuid] = DocumentsApiHelper::createDocumentForFlow($user1Bearer);
@@ -184,7 +184,7 @@ test('Documents — company ownership is saved and listed under company envelope
  * 4. Verify the same UUID is not visible in TEST_USER_2 list for both all/company ownership filters.
  */
 test('Documents — you cannot see another company document', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $user1Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     AccountCompaniesApiHelper::switchUser1ToCompanyRepresentativeRole($user1Bearer);
 
     [$apiBase, $uuid] = DocumentsApiHelper::createDocumentForFlow($user1Bearer);
@@ -202,8 +202,8 @@ test('Documents — you cannot see another company document', function () {
     expect(is_array($putJson))->toBeTrue('Ownership update returned non-JSON. raw=' . substr((string)$putRaw, 0, 700));
     expect((string)($putJson['data']['ownership'] ?? ''))->toBe('company');
 
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
-    [$switch2Status] = AccountCompaniesApiHelper::switchActiveRole($user2Bearer, (string)TEST_USER_2_PERSONAL_ROLE_UUID);
+    $user2Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
+    [$switch2Status] = AccountCompaniesApiHelper::switchActiveRole($user2Bearer, resolvedTestConfigValue('TEST_USER_2_PERSONAL_ROLE_UUID'));
     expect($switch2Status)->toBe(200);
 
     [$otherGetStatus] = ApiAuthHelper::apiRequest(
@@ -309,7 +309,7 @@ test('Documents — you cannot download another person’s PDF', function () {
 
 /**
  * Prerequisites:
- * - `TEST_USER_3_EMAIL` and `TEST_USER_3_PASSWORD` in `tests_config.php` point to a real “less verified” test account.
+ * - `resolvedTestConfigValue('TEST_USER_3_EMAIL')` and `resolvedTestConfigValue('TEST_USER_3_PASSWORD')` in `tests_config.php` point to a real “less verified” test account.
  *
  * Steps:
  * 1. Sign in as that third user and prepare a tiny PDF in memory.
@@ -319,7 +319,7 @@ test('Documents — you cannot download another person’s PDF', function () {
  * 5. If the upload did not succeed but JSON errors came back, check that at least one error message is present.
  */
 test('Documents — uncertified account may upload or be blocked (environment-specific)', function () {
-    $user3Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_3_EMAIL, TEST_USER_3_PASSWORD);
+    $user3Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_3_EMAIL'), resolvedTestConfigValue('TEST_USER_3_PASSWORD'));
 
     $pdfContent = "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF";
     $documentName = 'Flow test uncertified qualified ' . gmdate('YmdHis');
@@ -329,7 +329,7 @@ test('Documents — uncertified account may upload or be blocked (environment-sp
         $documentName,
         'QUALIFIED',
         $pdfContent,
-        API_URL . 'documents',
+        resolveTestConfig('API_URL') . 'documents',
         'flow-test-user3.pdf'
     );
 

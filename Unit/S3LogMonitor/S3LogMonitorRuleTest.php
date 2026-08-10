@@ -18,6 +18,7 @@ test('s3 log monitor rule applies default grace hours from db row', function () 
 	expect($rule->folder_id)->toBe(3);
 	expect($rule->window_days)->toBe(7);
 	expect($rule->grace_hours)->toBe(24);
+	expect($rule->should_send_warnings)->toBeFalse();
 });
 
 test('s3 log monitor rule keeps explicit zero grace hours', function () {
@@ -28,4 +29,14 @@ test('s3 log monitor rule keeps explicit zero grace hours', function () {
 	));
 
 	expect($rule->grace_hours)->toBe(0);
+});
+
+test('s3 log monitor rule maps warning preference from db row', function () {
+	$rule = S3LogMonitorRule::fromDbRow(array(
+		's3_log_monitor_folder_id' => 4,
+		'base_path'                => 'qtsp-logs/dr/sam/samdr',
+		'should_send_warnings'     => 1,
+	));
+
+	expect($rule->should_send_warnings)->toBeTrue();
 });

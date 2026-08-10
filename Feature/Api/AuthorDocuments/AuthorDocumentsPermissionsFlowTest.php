@@ -55,7 +55,7 @@ test('Author documents - someone else cannot update your draft', function () {
     TeamApiHelper::assertUserTwoConfigOrSkip();
 
     $bearer1 = AuthorDocumentsApiHelper::bearerWithCompanyAdmin();
-    $bearer2 = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
 
     $draft = AuthorDocumentsApiHelper::createDraftWithSignerParty(
         $bearer1,
@@ -84,7 +84,7 @@ test('Author documents - someone else cannot update your draft', function () {
  */
 test('Author documents - sending an already sent document is rejected', function () {
     $bearer = AuthorDocumentsApiHelper::bearerWithCompanyAdmin();
-    $signerEmail = defined('TEST_USER_2_EMAIL') ? TEST_USER_2_EMAIL : 'signer@example.com';
+    $signerEmail = isTestConfigDefined('TEST_USER_2_EMAIL') ? resolvedTestConfigValue('TEST_USER_2_EMAIL') : 'signer@example.com';
 
     $built = AuthorDocumentsApiHelper::createDraftCampaignAndUpload($bearer, $signerEmail);
     $uuid = $built['uuid'];

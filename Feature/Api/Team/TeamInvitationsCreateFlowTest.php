@@ -43,7 +43,7 @@ beforeAll(function () {
  * 3. If the server returns **HTTP 500** with **`invitation_email_queue_failed`**, skip this run with a clear message (known infrastructure limitation, not a product regression).
  */
 test('Team invitations - admin can create an employee invitation when email queue accepts the job', function () {
-    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $email = 'alexandru.zamfir+team-inv-' . gmdate('YmdHis') . '@simplifi.ro';
 
     [$status, $json, $raw] = TeamApiHelper::postJson(TeamApiHelper::invitationsUrl(), $bearer, [

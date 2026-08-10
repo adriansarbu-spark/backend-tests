@@ -68,7 +68,7 @@ $pickUser1RequestUuid = static function (string $bearer1): string {
  * 3. If user B **is** company admin, the server may return **HTTP 404** **`candidate_role_not_found`** for a fake UUID in **their** company — either way the call must **not** succeed with **HTTP 200** (no silent cross-tenant create).
  */
 test('Company representative-requests - POST create requires company admin or stays on own company scope', function () {
-    $bearer2 = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
     [$postSt, $postJson, $postRaw] = CompanyRepresentativeApiHelper::postJson(
         CompanyRepresentativeApiHelper::representativeRequestsUrl(),
         $bearer2,
@@ -101,7 +101,7 @@ test('Company representative-requests - POST create requires company admin or st
  */
 test('Company representative-requests - outsider cannot load another company’s request by UUID', function () use ($pickUser1RequestUuid) {
     $bearer1 = CompanyRepresentativeApiHelper::bearerTokenForUser1AsCompanyRepresentative();
-    $bearer2 = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
 
     $reqUuid = $pickUser1RequestUuid($bearer1);
     if ($reqUuid === '') {
@@ -134,7 +134,7 @@ test('Company representative-requests - outsider cannot load another company’s
  */
 test('Company representative-requests - outsider cannot cancel another company’s request by UUID', function () use ($pickUser1RequestUuid) {
     $bearer1 = CompanyRepresentativeApiHelper::bearerTokenForUser1AsCompanyRepresentative();
-    $bearer2 = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
 
     $reqUuid = $pickUser1RequestUuid($bearer1);
     if ($reqUuid === '') {

@@ -93,7 +93,7 @@ test('Team invitations - listing with an invalid token is refused', function () 
  * 3. For each invitation row, assert **`invitation_uuid`**, **`invited_email`**, **`role_code`**, and **`status`** are present (wire shape; no raw invite token).
  */
 test('Team invitations - company admin can list invitations with pagination meta', function () {
-    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     [$status, $json, $raw] = TeamApiHelper::get(
         TeamApiHelper::invitationsUrl() . '?page=1&per_page=20',
         $bearer
@@ -130,7 +130,7 @@ test('Team invitations - company admin can list invitations with pagination meta
  * 2. Expect **HTTP 405** (**method not allowed**).
  */
 test('Team invitations - unsupported HTTP method returns 405', function () {
-    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     [$status, $json, $raw] = ApiAuthHelper::apiRequest('DELETE', TeamApiHelper::invitationsUrl(), $bearer);
     $debug = 'status=' . $status . ' raw=' . substr($raw, 0, 600);
 

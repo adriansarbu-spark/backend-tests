@@ -43,7 +43,7 @@ beforeAll(function () {
  * 3. Open the owner’s template list and find that row; check name, category, visibility, status, version, party count, and smartfield count match what you created.
  */
 test('Templates - owner can create a template and see it in their list', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $user1Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $apiBase = TemplatesApiHelper::apiBase();
 
     $templateName = 'Templates CRUD flow ' . gmdate('YmdHis');
@@ -117,7 +117,7 @@ test('Templates - owner can create a template and see it in their list', functio
  * 4. Send **`parties`** / **`smartfields`** as non-arrays; expect **HTTP 422** with the matching **`field`** when structured.
  */
 test('Templates - bad create payloads return validation errors', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $user1Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $apiBase = TemplatesApiHelper::apiBase();
 
     // Missing name
@@ -228,7 +228,7 @@ test('Templates - bad create payloads return validation errors', function () {
  * 4. Delete the draft; expect **`data.deleted`** true; a follow-up open by id should be **not found** (**HTTP 404**).
  */
 test('Templates - owner can open, edit, and remove their own draft', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $user1Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
 
     [$apiBase, $uuid] = TemplatesApiHelper::createTemplateForFlow(
         $user1Bearer,
@@ -312,8 +312,8 @@ test('Templates - owner can open, edit, and remove their own draft', function ()
  * 4. User B tries to delete it; expect **HTTP 403** and errors (A’s template must still exist for A).
  */
 test('Templates - someone else cannot read, edit, or delete your private draft', function () {
-    $user1Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $user2Bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $user1Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
+    $user2Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
 
     [$apiBase, $uuid] = TemplatesApiHelper::createTemplateForFlow(
         $user1Bearer,

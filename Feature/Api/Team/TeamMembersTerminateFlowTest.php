@@ -43,9 +43,9 @@ beforeAll(function () {
  * 3. Expect **HTTP 404** and **`member_not_found`** (no membership is terminated).
  */
 test('Team members - terminate with unknown role UUID returns 404', function () {
-    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $unknownUuid = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
-    $totp = ApiAuthHelper::getOtpFromTotpSecret(TEST_USER_1_TOTP_SECRET);
+    $totp = ApiAuthHelper::getOtpFromTotpSecret(resolvedTestConfigValue('TEST_USER_1_TOTP_SECRET'));
 
     [$status, $json, $raw] = TeamApiHelper::postJson(
         TeamApiHelper::membersTerminateUrl($unknownUuid),
@@ -70,7 +70,7 @@ test('Team members - terminate with unknown role UUID returns 404', function () 
  * 2. Expect **HTTP 400** and **`totp_code_required`** before any membership change.
  */
 test('Team members - terminate without TOTP when enrolled is rejected', function () {
-    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $unknownUuid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
     [$status, $json, $raw] = TeamApiHelper::postJson(
@@ -89,19 +89,19 @@ test('Team members - terminate without TOTP when enrolled is rejected', function
  * - Company admin with TOTP; members list returns at least the caller’s own row.
  *
  * Steps:
- * 1. **GET** `/publicapi/v1/team/members` and find the row whose **`email`** matches **`TEST_USER_1_EMAIL`** (case-insensitive).
+ * 1. **GET** `/publicapi/v1/team/members` and find the row whose **`email`** matches **`resolvedTestConfigValue('TEST_USER_1_EMAIL')`** (case-insensitive).
  * 2. **POST** terminate for that **`role_uuid`** with valid **`totp_code`**.
  * 3. Expect **HTTP 409** and **`cannot_terminate_self`** (guardrail: you cannot fire yourself via this endpoint).
  */
 test('Team members - admin cannot terminate their own membership', function () {
-    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     [$listStatus, $listJson, $listRaw] = TeamApiHelper::get(
         TeamApiHelper::membersUrl() . '?member_status=any&per_page=100',
         $bearer
     );
     expect($listStatus)->toBe(200, 'GET members precondition failed: ' . substr($listRaw, 0, 800));
 
-    $needle = mb_strtolower(TEST_USER_1_EMAIL);
+    $needle = mb_strtolower(resolvedTestConfigValue('TEST_USER_1_EMAIL'));
     $selfUuid = '';
     foreach ((array)($listJson['data']['members'] ?? []) as $row) {
         if (!is_array($row)) {
@@ -117,7 +117,7 @@ test('Team members - admin cannot terminate their own membership', function () {
         test()->markTestSkipped('Could not resolve caller role_uuid from members list for self-terminate check.');
     }
 
-    $totp = ApiAuthHelper::getOtpFromTotpSecret(TEST_USER_1_TOTP_SECRET);
+    $totp = ApiAuthHelper::getOtpFromTotpSecret(resolvedTestConfigValue('TEST_USER_1_TOTP_SECRET'));
     [$status, $json, $raw] = TeamApiHelper::postJson(
         TeamApiHelper::membersTerminateUrl($selfUuid),
         $bearer,

@@ -18,6 +18,7 @@ test('db rule provider maps enabled folder rows to rule dtos', function () {
 			'timezone'                 => 'UTC',
 			'filename_pattern'         => null,
 			'allowed_days'             => 1,
+			'should_send_warnings'     => 1,
 			'enabled'                  => 1,
 		),
 	));
@@ -31,6 +32,7 @@ test('db rule provider maps enabled folder rows to rule dtos', function () {
 	expect($rules[0]->folder_id)->toBe(7);
 	expect($rules[0]->base_path)->toBe('qtsp-logs/prod/ejbca/ejbca01');
 	expect($rules[0]->allowed_days)->toBe(1);
+	expect($rules[0]->should_send_warnings)->toBeTrue();
 	expect($rules[0]->grace_hours)->toBe(24);
 	expect($db->hasInsertQuery())->toBeFalse();
 });

@@ -86,8 +86,8 @@ $resolveUser1PendingInvitationUuid = static function (string $bearer1): array {
  * 3. Expect the operation **not** to succeed: **404** `invitation_not_found`, **403** `admin_role_required`, or **400** `company_context_required` / `company_role_required` when B has no company or cannot act as admin.
  */
 test('Team invitations - outsider cannot revoke another company’s invitation by UUID', function () use ($resolveUser1PendingInvitationUuid) {
-    $bearer1 = TeamApiHelper::bearerWithActiveCompanyAdminRole(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $bearer2 = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $bearer1 = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
+    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
 
     [$list1St, $list1Json, $list1Raw] = TeamApiHelper::get(TeamApiHelper::invitationsUrl() . '?per_page=1', $bearer1);
     expect($list1St)->toBe(200, 'User1 must list invitations as admin for this scenario. ' . substr((string)$list1Raw, 0, 400));
@@ -136,8 +136,8 @@ test('Team invitations - outsider cannot revoke another company’s invitation b
  * 2. Expect **not HTTP 200**; blocked responses same as revoke isolation.
  */
 test('Team invitations - outsider cannot resend another company’s invitation by UUID', function () use ($resolveUser1PendingInvitationUuid) {
-    $bearer1 = TeamApiHelper::bearerWithActiveCompanyAdminRole(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
-    $bearer2 = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $bearer1 = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
+    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
 
     [$list1St, $list1Json, $list1Raw] = TeamApiHelper::get(TeamApiHelper::invitationsUrl() . '?per_page=1', $bearer1);
     expect($list1St)->toBe(200, substr((string)$list1Raw, 0, 400));
@@ -180,7 +180,7 @@ test('Team invitations - outsider cannot resend another company’s invitation b
  * 2. Expect the same class of refusal on **POST** as on **GET** list (non-admin or no company).
  */
 test('Team invitations - non-admin cannot create an invitation for their company', function () {
-    $bearer2 = ApiAuthHelper::bearerTokenFor(TEST_USER_2_EMAIL, TEST_USER_2_PASSWORD);
+    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
     [$listSt, $listJson, $listRaw] = TeamApiHelper::get(TeamApiHelper::invitationsUrl() . '?per_page=1', $bearer2);
 
     $listErr = TeamApiHelper::joinedErrors($listJson);
@@ -230,7 +230,7 @@ test('Team invitations - non-admin cannot create an invitation for their company
  * 6. Any other status is a hard failure with response details for debugging.
  */
 test('Team invitations - list and optional dummy create stay on the session company_uuid', function () {
-    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     [$listSt, $listJson, $listRaw] = TeamApiHelper::get(
         TeamApiHelper::invitationsUrl() . '?per_page=50',
         $bearer

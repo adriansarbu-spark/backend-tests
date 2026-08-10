@@ -92,7 +92,7 @@ test('Account companies - listing with an invalid token is refused', function ()
  * 2. Expect **HTTP 200** and **`data.companies`** as a list where each company has a non-empty **`company_uuid`**, keys **`company_name`** and **`country`** (name may be blank in legacy data), **`is_personal`**, and a **`roles`** array whose entries include **`role_uuid`** and **`role_code`**.
  */
 test('Account companies - signed-in user can list their companies with UUIDs and roles', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     [$status, $json, $raw] = AccountCompaniesApiHelper::get($bearer);
 
     $jsonText = is_array($json) ? (string)json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : 'null';
@@ -130,7 +130,7 @@ test('Account companies - signed-in user can list their companies with UUIDs and
  * 2. Expect **HTTP 405** (method not allowed) so routing stays limited to **GET** and **POST**.
  */
 test('Account companies - unsupported HTTP method returns 405', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     [$status, , $raw] = ApiAuthHelper::apiRequest('DELETE', AccountCompaniesApiHelper::url(), $bearer);
     $debug = 'status=' . $status . ' raw=' . substr($raw, 0, 600);
 

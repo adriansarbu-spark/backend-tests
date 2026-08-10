@@ -90,7 +90,7 @@ final class DocumentsApiHelper
         ?string $apiBase = null,
         ?string $uploadFilename = null
     ): array {
-        $apiBase = $apiBase ?? (API_URL . 'documents');
+        $apiBase = $apiBase ?? (resolveTestConfig('API_URL') . 'documents');
         $uploadFilename = $uploadFilename ?? 'flow-test.pdf';
 
         [$status, $json, $raw] = ApiAuthHelper::apiRequest('POST', $apiBase, $userBearer, [
@@ -129,7 +129,7 @@ final class DocumentsApiHelper
      */
     public static function createDocumentForFlow(string $userBearer, ?string $apiBase = null): array
     {
-        $apiBase = $apiBase ?? (API_URL . 'documents');
+        $apiBase = $apiBase ?? (resolveTestConfig('API_URL') . 'documents');
         $pdfContent = "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF";
         $documentName = 'Flow test ' . gmdate('YmdHis');
 

@@ -45,7 +45,7 @@ beforeAll(function () {
  * 5. Delete the template; expect **`data.deleted`** true.
  */
 test('Templates - parties and smartfields round-trip on create, update, and read', function () {
-    $bearer = ApiAuthHelper::bearerTokenFor(TEST_USER_1_EMAIL, TEST_USER_1_PASSWORD);
+    $bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
     $apiBase = TemplatesApiHelper::apiBase();
     $name = 'Parties/SF flow ' . gmdate('YmdHis');
 
