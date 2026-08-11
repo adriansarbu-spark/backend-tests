@@ -93,6 +93,20 @@ final class TeamApiHelper
     }
 
     /**
+     * True for 403 denials on team invitation routes for a non-admin / under-permissioned role.
+     * Route permission gate may return `access_denied` before the admin gate returns `admin_role_required`.
+     */
+    public static function isTeamInvitationForbidden(int $status, ?array $json): bool
+    {
+        if ((int)$status !== 403 || !is_array($json)) {
+            return false;
+        }
+        $e = self::joinedErrors($json);
+
+        return str_contains($e, 'admin_role_required') || str_contains($e, 'access_denied');
+    }
+
+    /**
      * Skip the current test when the bearer is not a company admin (integration env mismatch).
      */
     public static function skipIfAdminRoleRequired(int $status, ?array $json, string $context = ''): void
@@ -119,6 +133,18 @@ final class TeamApiHelper
     }
 
     /**
+     * Non-admin / no-company refusal on invitation list or create (not cross-tenant 404).
+     */
+    public static function isTeamInvitationPrivilegeDenied(int $status, ?array $json): bool
+    {
+        if (self::isTeamInvitationForbidden($status, $json)) {
+            return true;
+        }
+
+        return (int)$status === 400 && self::isCompanyMembershipRequiredError($json);
+    }
+
+    /**
      * Outsider was blocked from mutating another tenant’s invitation (acceptable outcomes for isolation tests).
      */
     public static function isOutsiderTeamInvitationMutationBlocked(int $status, ?array $json): bool
@@ -130,14 +156,34 @@ final class TeamApiHelper
         if ($status === 404 && str_contains($e, 'invitation_not_found')) {
             return true;
         }
-        if ($status === 403 && (str_contains($e, 'admin_role_required') || str_contains($e, 'access_denied'))) {
-            return true;
-        }
-        if ($status === 400 && self::isCompanyMembershipRequiredError($json)) {
-            return true;
+
+        return self::isTeamInvitationPrivilegeDenied($status, $json);
+    }
+
+    /**
+     * Bearer for TEST_USER_1 on the dedicated non-admin company role
+     * (`BILLING_TEST_COMPANY_NON_ADMIN_UUID`) — used for same-tenant privilege denials.
+     */
+    public static function bearerWithUser1CompanyNonAdminRole(): string
+    {
+        self::assertRequiredConfigOrSkip();
+        assertTestConfigKeysOrSkip(['BILLING_TEST_COMPANY_NON_ADMIN_UUID']);
+
+        $bearer = ApiAuthHelper::bearerTokenFor(
+            resolvedTestConfigValue('TEST_USER_1_EMAIL'),
+            resolvedTestConfigValue('TEST_USER_1_PASSWORD')
+        );
+        $roleUuid = trim(resolvedTestConfigValue('BILLING_TEST_COMPANY_NON_ADMIN_UUID'));
+        [$status, $json, $raw] = AccountCompaniesApiHelper::switchActiveRole($bearer, $roleUuid);
+        if ($status !== 200) {
+            test()->markTestSkipped(
+                'Could not switch TEST_USER_1 to BILLING_TEST_COMPANY_NON_ADMIN_UUID (status=' . $status
+                . ', errors=' . self::joinedErrors($json)
+                . ', raw=' . ApiAuthHelper::sanitizeRawForTestMessage((string)$raw) . ').'
+            );
         }
 
-        return false;
+        return $bearer;
     }
 
     /**

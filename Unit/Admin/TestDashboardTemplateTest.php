@@ -30,6 +30,8 @@ test('admin tests dashboard template renders test history graph container', func
     expect($template)->toContain('tabindex="0"');
     expect($template)->toContain("window.__passHistoryGraphDetailLines = points.map(function(item) {");
     expect($template)->toContain('function computePassPercentageFromCounts(passed, failed, skipped)');
+    expect($template)->toContain('function buildSkipMessageMap(runJson, parsedOutput)');
+    expect($template)->toContain('test-skip-message');
     expect($template)->toContain('function formatPassPercentageLabel(summary)');
     expect($template)->toContain("return 'Date: ' + formatHistoryTimestamp(item.timestamp)");
     expect($template)->toContain('+ \'\\nTotal tests: \' + summary.total');

@@ -196,6 +196,9 @@ if (! class_exists(CscEntitlementGrantStub::class)) {
         /** @var array<string, int> */
         public array $remainingByCode = [];
 
+        /** @var array<string, int> entitlement_code => overdraft qty */
+        public array $overdraftByCode = [];
+
         public function getActiveGrantTotalsByCompany(int $companyId): array
         {
             return $this->activeTotals;
@@ -209,6 +212,11 @@ if (! class_exists(CscEntitlementGrantStub::class)) {
         public function computeFifoAvailableRemaining(int $companyId, string $code): int
         {
             return (int) ($this->remainingByCode[$code] ?? 0);
+        }
+
+        public function computeFifoOverdraft(int $companyId, string $code): int
+        {
+            return (int) ($this->overdraftByCode[$code] ?? 0);
         }
     }
 }

@@ -6,14 +6,17 @@ if (!defined('DB_PREFIX')) {
     define('DB_PREFIX', '');
 }
 
-// signing.php calls \ModelSigningSigner::isGuestInvitation() without going through $this->load->model.
-// Unit tests do not bootstrap the catalog model file, so provide the same static helpers as
-// catalog/model/signing/signer.php (invitation type resolution only).
+// signing.php calls \ModelSigningSigner::isGuestInvitation() / isSimpleSignatureKind()
+// without going through $this->load->model. Unit tests do not bootstrap the catalog
+// model file, so provide the same static helpers as catalog/model/signing/signer.php.
 if (!class_exists('ModelSigningSigner', false)) {
     class ModelSigningSigner {
         public const INVITATION_STANDARD = 'standard_invitation';
         public const INVITATION_GUEST = 'guest_invitation';
         public const INVITATION_SPONSORED = 'sponsored_invitation';
+
+        public const KIND_QUALIFIED = 'qualified';
+        public const KIND_SIMPLE = 'simple';
 
         public static function invitationTypeFromRow(array $row): string
         {
@@ -42,6 +45,16 @@ if (!class_exists('ModelSigningSigner', false)) {
         {
             return in_array($type, [self::INVITATION_STANDARD, self::INVITATION_GUEST, self::INVITATION_SPONSORED], true);
         }
+
+        public static function isValidSignatureKind($kind): bool
+        {
+            return in_array($kind, [self::KIND_QUALIFIED, self::KIND_SIMPLE], true);
+        }
+
+        public static function isSimpleSignatureKind(array $row): bool
+        {
+            return isset($row['signature_kind']) && trim((string)$row['signature_kind']) === self::KIND_SIMPLE;
+        }
     }
 }
 
@@ -49,6 +62,42 @@ if (!class_exists('ModelSigningSigner', false)) {
 if (!class_exists('ModelCertificateCertificate', false)) {
     class ModelCertificateCertificate {
         public const USAGE_DOCUMENT_SIGNING = 'document_signing';
+    }
+}
+
+// signing.php / SigningWorkflow call \ModelSigningAuditEvent statics and ->record()
+// without bootstrapping catalog/model/signing/audit_event.php in unit tests.
+if (!class_exists('ModelSigningAuditEvent', false)) {
+    class ModelSigningAuditEvent {
+        public const EVENT_SENT = 'sent';
+        public const EVENT_VIEWED = 'viewed';
+        public const EVENT_CONSENT_ACCEPTED = 'consent_accepted';
+        public const EVENT_SIGNED = 'signed';
+        public const EVENT_REJECTED = 'rejected';
+        public const EVENT_COMPLETED = 'completed';
+
+        /** @var list<array{document_id:int,document_signer_id:int|null,event_type:string,meta:array}> */
+        public array $records = [];
+
+        public function record($document_id, $document_signer_id, $event_type, array $meta = []): void
+        {
+            $this->records[] = [
+                'document_id'        => (int)$document_id,
+                'document_signer_id' => $document_signer_id !== null ? (int)$document_signer_id : null,
+                'event_type'         => (string)$event_type,
+                'meta'               => $meta,
+            ];
+        }
+
+        /**
+         * @param string|null $cert_pem
+         * @return array<string,string>
+         */
+        public static function certificateEvidenceFromPem($cert_pem): array
+        {
+            // Unit fixtures use placeholder PEM strings; skip openssl parsing.
+            return [];
+        }
     }
 }
 

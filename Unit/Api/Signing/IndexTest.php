@@ -185,6 +185,6 @@ test('index responds with 405 for invalid method or action', function () {
     $this->controller->index();
 
     expect($this->controller->statusCode)->toBe(405);
-    expect($this->controller->allowedHeaders)->toBe(['GET', 'POST', 'PUT']);
+    expect($this->controller->allowedHeaders)->toBe(['GET', 'POST', 'PUT', 'DELETE']);
 });
 

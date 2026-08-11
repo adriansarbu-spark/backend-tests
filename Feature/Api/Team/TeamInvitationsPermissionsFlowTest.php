@@ -24,13 +24,15 @@ if (SKIP_INTEGRATION_TESTS) {
  * File guard (runs once before any scenario in this file):
  *
  * Prerequisites:
- * - Integration tests are on; Keycloak plus **`TEST_USER_1_*`** and **`TEST_USER_2_*`** are configured.
+ * - Integration tests are on; Keycloak plus **`TEST_USER_1_*`** and
+ *   **`BILLING_TEST_COMPANY_NON_ADMIN_UUID`** (user1 non-admin company role) are configured.
  *
  * Steps:
  * 1. Confirm required constants are present; if not, skip the whole file.
  */
 beforeAll(function () {
-    TeamApiHelper::assertUserTwoConfigOrSkip();
+    TeamApiHelper::assertRequiredConfigOrSkip();
+    assertTestConfigKeysOrSkip(['BILLING_TEST_COMPANY_NON_ADMIN_UUID']);
 });
 
 /**
@@ -78,49 +80,50 @@ $resolveUser1PendingInvitationUuid = static function (string $bearer1): array {
 
 /**
  * Prerequisites:
- * - User A is company admin and has (or can create) at least one **pending** invitation; user B is signed in on a **different** company than A (same `company_uuid` on both accounts would make isolation impossible to assert here).
+ * - User A is company admin and has (or can create) at least one **pending** invitation;
+ *   non-admin probe uses the same TEST_USER_1 on **`BILLING_TEST_COMPANY_NON_ADMIN_UUID`**
+ *   (active role switched only after admin setup completes).
  *
  * Steps:
- * 1. Read user A’s **`data.company_uuid`** and a real **`invitation_uuid`** for that company.
- * 2. As user B, **POST** `/publicapi/v1/team/invitations/revoke` with A’s **`invitation_uuid`**.
- * 3. Expect the operation **not** to succeed: **404** `invitation_not_found`, **403** `admin_role_required`, or **400** `company_context_required` / `company_role_required` when B has no company or cannot act as admin.
+ * 1. As admin, resolve a real **`invitation_uuid`**.
+ * 2. Switch the same user to the non-admin role and **POST** `/publicapi/v1/team/invitations/revoke`.
+ * 3. Expect the operation **not** to succeed: **404** `invitation_not_found`, **403** `admin_role_required` /
+ *    `access_denied`, or **400** `company_context_required` / `company_role_required`.
  */
 test('Team invitations - outsider cannot revoke another company’s invitation by UUID', function () use ($resolveUser1PendingInvitationUuid) {
-    $bearer1 = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
-    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
+    $bearerAdmin = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
 
-    [$list1St, $list1Json, $list1Raw] = TeamApiHelper::get(TeamApiHelper::invitationsUrl() . '?per_page=1', $bearer1);
+    [$list1St, , $list1Raw] = TeamApiHelper::get(TeamApiHelper::invitationsUrl() . '?per_page=1', $bearerAdmin);
     expect($list1St)->toBe(200, 'User1 must list invitations as admin for this scenario. ' . substr((string)$list1Raw, 0, 400));
 
-    $companyUuid1 = (string)($list1Json['data']['company_uuid'] ?? '');
-
-    [$list2St, $list2Json, $list2Raw] = TeamApiHelper::get(TeamApiHelper::invitationsUrl() . '?per_page=1', $bearer2);
-    if ($list2St === 403) {
-        // User2 is not company admin — still must not revoke user1’s invite (exercise POST revoke path).
-        expect(TeamApiHelper::joinedErrors($list2Json))->toMatch('/admin_role_required|access_denied/');
-    } elseif ($list2St === 400 && TeamApiHelper::isCompanyMembershipRequiredError($list2Json)) {
-        // No active company / wrong membership — cannot list invitations for a tenant.
-        expect(TeamApiHelper::joinedErrors($list2Json))->not->toBe('');
-    } elseif ($list2St === 200 && is_array($list2Json)) {
-        $companyUuid2 = (string)($list2Json['data']['company_uuid'] ?? '');
-        if ($companyUuid1 !== '' && $companyUuid2 !== '' && $companyUuid1 === $companyUuid2) {
-            test()->markTestSkipped('TEST_USER_1 and TEST_USER_2 share the same company_uuid; cross-company revoke isolation is not asserted in this environment.');
-        }
-    }
-
-    [$invUuid, $dbg] = $resolveUser1PendingInvitationUuid($bearer1);
+    [$invUuid, $dbg] = $resolveUser1PendingInvitationUuid($bearerAdmin);
     if ($invUuid === '') {
         test()->markTestSkipped('No pending invitation_uuid for user1 (list empty and create failed or queue failed). ' . $dbg);
     }
 
-    [$revSt, $revJson, $revRaw] = TeamApiHelper::postJson(TeamApiHelper::invitationsRevokeUrl(), $bearer2, [
+    // Same Keycloak user: switch active role only after admin setup is done.
+    $bearerNonAdmin = TeamApiHelper::bearerWithUser1CompanyNonAdminRole();
+
+    [$list2St, $list2Json, $list2Raw] = TeamApiHelper::get(TeamApiHelper::invitationsUrl() . '?per_page=1', $bearerNonAdmin);
+    if ($list2St === 200) {
+        test()->markTestSkipped(
+            'BILLING_TEST_COMPANY_NON_ADMIN_UUID can list invitations (treated as admin); non-admin revoke denial is not asserted. raw='
+            . substr((string)$list2Raw, 0, 300)
+        );
+    }
+    expect(TeamApiHelper::isTeamInvitationPrivilegeDenied($list2St, $list2Json))->toBeTrue(
+        'Expected 403 admin_role_required|access_denied or 400 company context on non-admin list. raw='
+        . substr((string)$list2Raw, 0, 400)
+    );
+
+    [$revSt, $revJson, $revRaw] = TeamApiHelper::postJson(TeamApiHelper::invitationsRevokeUrl(), $bearerNonAdmin, [
         'invitation_uuid' => $invUuid,
     ]);
     $revDebug = 'status=' . $revSt . ' errors=' . TeamApiHelper::joinedErrors($revJson) . ' raw=' . substr($revRaw, 0, 700);
 
-    expect($revSt)->not->toBe(200, 'Outsider must not successfully revoke another company invitation. ' . $revDebug);
+    expect($revSt)->not->toBe(200, 'Non-admin must not successfully revoke an invitation. ' . $revDebug);
     expect(TeamApiHelper::isOutsiderTeamInvitationMutationBlocked($revSt, $revJson))->toBeTrue(
-        'Expected 403 admin, 404 invitation_not_found, or 400 company_context_required / company_role_required. ' . $revDebug
+        'Expected 403 admin/access_denied, 404 invitation_not_found, or 400 company_context_required / company_role_required. ' . $revDebug
     );
     if (is_array($revJson)) {
         expect(TeamApiHelper::joinedErrors($revJson))->not->toBe('');
@@ -129,42 +132,46 @@ test('Team invitations - outsider cannot revoke another company’s invitation b
 
 /**
  * Prerequisites:
- * - Same as revoke outsider scenario: user A has a pending **`invitation_uuid`**; user B on a different company (or non-admin on theirs).
+ * - Admin has a pending **`invitation_uuid`**; non-admin probe is TEST_USER_1 on
+ *   **`BILLING_TEST_COMPANY_NON_ADMIN_UUID`** (switched after admin setup).
  *
  * Steps:
- * 1. As user B, **POST** `/publicapi/v1/team/invitations/resend` with A’s **`invitation_uuid`**.
+ * 1. As non-admin, **POST** `/publicapi/v1/team/invitations/resend` with the invitation UUID.
  * 2. Expect **not HTTP 200**; blocked responses same as revoke isolation.
  */
 test('Team invitations - outsider cannot resend another company’s invitation by UUID', function () use ($resolveUser1PendingInvitationUuid) {
-    $bearer1 = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
-    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
+    $bearerAdmin = TeamApiHelper::bearerWithActiveCompanyAdminRole(resolvedTestConfigValue('TEST_USER_1_EMAIL'), resolvedTestConfigValue('TEST_USER_1_PASSWORD'));
 
-    [$list1St, $list1Json, $list1Raw] = TeamApiHelper::get(TeamApiHelper::invitationsUrl() . '?per_page=1', $bearer1);
+    [$list1St, , $list1Raw] = TeamApiHelper::get(TeamApiHelper::invitationsUrl() . '?per_page=1', $bearerAdmin);
     expect($list1St)->toBe(200, substr((string)$list1Raw, 0, 400));
 
-    $companyUuid1 = (string)($list1Json['data']['company_uuid'] ?? '');
-
-    [$list2St, $list2Json] = TeamApiHelper::get(TeamApiHelper::invitationsUrl() . '?per_page=1', $bearer2);
-    if ($list2St === 200 && is_array($list2Json)) {
-        $companyUuid2 = (string)($list2Json['data']['company_uuid'] ?? '');
-        if ($companyUuid1 !== '' && $companyUuid2 !== '' && $companyUuid1 === $companyUuid2) {
-            test()->markTestSkipped('TEST_USER_1 and TEST_USER_2 share the same company_uuid; cross-company resend isolation is not asserted.');
-        }
-    }
-
-    [$invUuid, $dbg] = $resolveUser1PendingInvitationUuid($bearer1);
+    [$invUuid, $dbg] = $resolveUser1PendingInvitationUuid($bearerAdmin);
     if ($invUuid === '') {
         test()->markTestSkipped('No pending invitation_uuid for user1. ' . $dbg);
     }
 
-    [$rsSt, $rsJson, $rsRaw] = TeamApiHelper::postJson(TeamApiHelper::invitationsResendUrl(), $bearer2, [
+    $bearerNonAdmin = TeamApiHelper::bearerWithUser1CompanyNonAdminRole();
+
+    [$list2St, $list2Json, $list2Raw] = TeamApiHelper::get(TeamApiHelper::invitationsUrl() . '?per_page=1', $bearerNonAdmin);
+    if ($list2St === 200) {
+        test()->markTestSkipped(
+            'BILLING_TEST_COMPANY_NON_ADMIN_UUID can list invitations (treated as admin); non-admin resend denial is not asserted. raw='
+            . substr((string)$list2Raw, 0, 300)
+        );
+    }
+    expect(TeamApiHelper::isTeamInvitationPrivilegeDenied($list2St, $list2Json))->toBeTrue(
+        'Expected 403 admin_role_required|access_denied or 400 company context on non-admin list. raw='
+        . substr((string)$list2Raw, 0, 400)
+    );
+
+    [$rsSt, $rsJson, $rsRaw] = TeamApiHelper::postJson(TeamApiHelper::invitationsResendUrl(), $bearerNonAdmin, [
         'invitation_uuid' => $invUuid,
     ]);
     $rsDebug = 'status=' . $rsSt . ' errors=' . TeamApiHelper::joinedErrors($rsJson) . ' raw=' . substr($rsRaw, 0, 700);
 
-    expect($rsSt)->not->toBe(200, 'Outsider must not successfully resend another company invitation. ' . $rsDebug);
+    expect($rsSt)->not->toBe(200, 'Non-admin must not successfully resend an invitation. ' . $rsDebug);
     expect(TeamApiHelper::isOutsiderTeamInvitationMutationBlocked($rsSt, $rsJson))->toBeTrue(
-        'Expected 403 admin, 404 invitation_not_found, or 400 company_context_required / company_role_required. ' . $rsDebug
+        'Expected 403 admin/access_denied, 404 invitation_not_found, or 400 company_context_required / company_role_required. ' . $rsDebug
     );
     if (is_array($rsJson)) {
         expect(TeamApiHelper::joinedErrors($rsJson))->not->toBe('');
@@ -173,47 +180,39 @@ test('Team invitations - outsider cannot resend another company’s invitation b
 
 /**
  * Prerequisites:
- * - User B cannot administer invitations: either not company admin (**403** **`admin_role_required`**) or outside company context (**400** **`company_context_required`** / **`company_role_required`**).
+ * - TEST_USER_1 on **`BILLING_TEST_COMPANY_NON_ADMIN_UUID`** cannot administer invitations:
+ *   **403** **`admin_role_required`** / **`access_denied`** (same as revoke/resend), or **400** company-context errors.
  *
  * Steps:
- * 1. **POST** `/publicapi/v1/team/invitations` as user B with a valid **`email`** and **`employee`** **`role_code`**.
- * 2. Expect the same class of refusal on **POST** as on **GET** list (non-admin or no company).
+ * 1. **GET** `/publicapi/v1/team/invitations` as that non-admin role — expect privilege denial.
+ * 2. **POST** create with a valid **`email`** and **`employee`** **`role_code`** — expect the same denial class.
  */
 test('Team invitations - non-admin cannot create an invitation for their company', function () {
-    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
-    [$listSt, $listJson, $listRaw] = TeamApiHelper::get(TeamApiHelper::invitationsUrl() . '?per_page=1', $bearer2);
-
-    $listErr = TeamApiHelper::joinedErrors($listJson);
-    $listDeniedNonAdmin = $listSt === 403 && str_contains($listErr, 'admin_role_required');
-    $listDeniedNoCompany = $listSt === 400 && TeamApiHelper::isCompanyMembershipRequiredError($listJson);
+    $bearerNonAdmin = TeamApiHelper::bearerWithUser1CompanyNonAdminRole();
+    [$listSt, $listJson, $listRaw] = TeamApiHelper::get(TeamApiHelper::invitationsUrl() . '?per_page=1', $bearerNonAdmin);
 
     if ($listSt === 200) {
-        test()->markTestSkipped('TEST_USER_2 is a company admin in this environment; non-admin POST denial is not asserted.');
-    }
-    if (!$listDeniedNonAdmin && !$listDeniedNoCompany) {
-        test()->markTestSkipped('Unexpected GET invitations status for user2 (status=' . $listSt . ' raw=' . substr($listRaw, 0, 400) . ').');
-    }
-    if ($listDeniedNonAdmin) {
-        expect($listErr)->toContain('admin_role_required');
-    } else {
-        expect(TeamApiHelper::isCompanyMembershipRequiredError($listJson))->toBeTrue('Expected company_context_required or company_role_required on list.');
+        test()->markTestSkipped('BILLING_TEST_COMPANY_NON_ADMIN_UUID can list invitations; non-admin POST denial is not asserted.');
     }
 
+    $listDebug = 'list_status=' . $listSt . ' raw=' . substr($listRaw, 0, 400);
+    expect(TeamApiHelper::isTeamInvitationPrivilegeDenied($listSt, $listJson))->toBeTrue(
+        'Expected 403 admin_role_required|access_denied or 400 company context on non-admin list. ' . $listDebug
+    );
+
     $email = 'alexandru.zamfir+team-nonadmin-' . gmdate('YmdHis') . '@simplifi.ro';
-    [$postSt, $postJson, $postRaw] = TeamApiHelper::postJson(TeamApiHelper::invitationsUrl(), $bearer2, [
+    [$postSt, $postJson, $postRaw] = TeamApiHelper::postJson(TeamApiHelper::invitationsUrl(), $bearerNonAdmin, [
         'email' => $email,
         'role_code' => 'employee',
     ]);
-    $debug = 'status=' . $postSt . ' raw=' . substr($postRaw, 0, 600);
+    $postDebug = 'post_status=' . $postSt . ' raw=' . substr($postRaw, 0, 600);
 
-    if ($listDeniedNonAdmin) {
-        expect($postSt)->toBe(403, $debug);
-        expect(TeamApiHelper::joinedErrors($postJson))->toContain('admin_role_required');
-    } else {
-        expect($postSt)->toBe(400, $debug);
-        expect(TeamApiHelper::isCompanyMembershipRequiredError($postJson))->toBeTrue(
-            'POST should reject without company context. errors=' . TeamApiHelper::joinedErrors($postJson)
-        );
+    expect($postSt)->not->toBe(200, 'Non-admin must not create an invitation. ' . $postDebug);
+    expect(TeamApiHelper::isTeamInvitationPrivilegeDenied($postSt, $postJson))->toBeTrue(
+        'Expected 403 admin_role_required|access_denied or 400 company context on non-admin create. ' . $postDebug
+    );
+    if (is_array($postJson)) {
+        expect(TeamApiHelper::joinedErrors($postJson))->not->toBe('');
     }
 });
 

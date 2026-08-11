@@ -15,7 +15,9 @@ if (SKIP_INTEGRATION_TESTS) {
      * 1. Mark this placeholder as skipped so no CRL propagation API calls run.
      */
     test('Certificates CRL - integration tests are turned off for this run', function () {
-        $this->markTestSkipped('Integration tests are disabled');
+        $this->markTestSkipped(
+            'Integration tests are disabled (SKIP_INTEGRATION_TESTS=true); CRL revocation propagation flow was not run.'
+        );
     });
     return;
 }
@@ -266,4 +268,7 @@ test('Certificates CRL - revocation propagates to CRL within SLA for TEST_USER_1
         '',
         'Cleanup did not observe a new certificate serial after reissue. ' . $cleanupDebug
     );
-})->skip(SKIP_CRL_VALIDATION_TESTS);
+})->skip(
+    SKIP_CRL_VALIDATION_TESTS,
+    'CRL revocation propagation flow is unfinished / intentionally disabled (SKIP_CRL_VALIDATION_TESTS=true).'
+);

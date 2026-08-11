@@ -94,6 +94,9 @@ beforeEach(function () {
                     }
                 };
             }
+            if ($name === 'signing/audit_event') {
+                $this->controller->model_signing_audit_event = new ModelSigningAuditEvent();
+            }
         }
     };
 

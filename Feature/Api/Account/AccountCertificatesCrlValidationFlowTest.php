@@ -15,7 +15,9 @@ if (SKIP_INTEGRATION_TESTS) {
      * 1. Mark this placeholder as skipped so no CRL validation API calls run.
      */
     test('Certificates CRL - integration tests are turned off for this run', function () {
-        $this->markTestSkipped('Integration tests are disabled');
+        $this->markTestSkipped(
+            'Integration tests are disabled (SKIP_INTEGRATION_TESTS=true); CRL validation flow was not run.'
+        );
     });
     return;
 }
@@ -92,4 +94,7 @@ test('Certificates CRL - TEST_USER_1 valid certificate is not revoked in a valid
     expect($validation['this_update'])->not->toBeNull();
     expect($validation['next_update'])->not->toBeNull();
     expect($validation['threshold_violations'])->toBe([]);
-})->skip(SKIP_CRL_VALIDATION_TESTS);
+})->skip(
+    SKIP_CRL_VALIDATION_TESTS,
+    'CRL validation flow is unfinished / intentionally disabled (SKIP_CRL_VALIDATION_TESTS=true).'
+);

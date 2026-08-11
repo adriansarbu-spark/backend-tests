@@ -45,16 +45,7 @@ test('Billing — assigned and released seat stays consistent across seats me an
     $roleUuid = BillingFixtureHelper::value('BILLING_TEST_TARGET_ROLE_UUID');
     $slotUuid = BillingFixtureHelper::value('BILLING_TEST_FREE_SEAT_SLOT_UUID');
     $roleHeaders = ['x-role-uuid' => $roleUuid];
-
-    [$beforeSeatsStatus, $beforeSeats] = BillingApiHelper::get('billing/seats', $bearer, [
-        'subscription_item_uuid' => $itemUuid,
-        'status' => 'all',
-    ]);
-    expect($beforeSeatsStatus)->toBe(200);
-    $beforeBySlot = array_column($beforeSeats['data']['items'] ?? [], null, 'seat_slot_uuid');
-    if (($beforeBySlot[$slotUuid]['slot_status'] ?? null) !== 'unassigned') {
-        $this->markTestSkipped('Configured BILLING_TEST_FREE_SEAT_SLOT_UUID is not currently unassigned.');
-    }
+    BillingFixtureHelper::ensureFreeSeatSlotUnassigned($bearer);
 
     [$beforeMeStatus, $beforeMe] = BillingApiHelper::get('billing/me', $bearer, headers: $roleHeaders);
     if ($beforeMeStatus !== 200) {

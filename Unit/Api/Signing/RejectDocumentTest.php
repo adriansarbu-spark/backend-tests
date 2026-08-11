@@ -41,11 +41,19 @@ beforeEach(function () {
     $this->signCode = 'c894afec-2494-4520-a8f3-ae05172356e0';
 
     // Minimal load stub; tests inject models directly.
-    $this->controller->load = new class {
+    $this->controller->load = new class ($this->controller) {
+        private $controller;
         public array $loaded = [];
+        public function __construct($controller)
+        {
+            $this->controller = $controller;
+        }
         public function model(string $name): void
         {
             $this->loaded[] = $name;
+            if ($name === 'signing/audit_event') {
+                $this->controller->model_signing_audit_event = new ModelSigningAuditEvent();
+            }
         }
     };
 

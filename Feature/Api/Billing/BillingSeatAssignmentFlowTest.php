@@ -131,16 +131,7 @@ test('Billing — admin assigns and idempotently releases a dedicated free seat'
     $slotUuid = BillingFixtureHelper::value('BILLING_TEST_FREE_SEAT_SLOT_UUID');
     $roleUuid = BillingFixtureHelper::value('BILLING_TEST_TARGET_ROLE_UUID');
     $itemUuid = BillingFixtureHelper::value('BILLING_TEST_SUBSCRIPTION_ITEM_UUID');
-
-    [$beforeStatus, $before] = BillingApiHelper::get('billing/seats', $bearer, [
-        'subscription_item_uuid' => $itemUuid,
-        'status' => 'all',
-    ]);
-    expect($beforeStatus)->toBe(200);
-    $beforeBySlot = array_column($before['data']['items'] ?? [], null, 'seat_slot_uuid');
-    if (($beforeBySlot[$slotUuid]['slot_status'] ?? null) !== 'unassigned') {
-        $this->markTestSkipped('Configured BILLING_TEST_FREE_SEAT_SLOT_UUID is not currently unassigned.');
-    }
+    BillingFixtureHelper::ensureFreeSeatSlotUnassigned($bearer);
 
     $assignedByThisTest = false;
     try {
@@ -199,17 +190,8 @@ test('Billing — one role cannot receive duplicate seats from the same plan', f
     $slotUuid = BillingFixtureHelper::value('BILLING_TEST_FREE_SEAT_SLOT_UUID');
     $roleUuid = BillingFixtureHelper::value('BILLING_TEST_TARGET_ROLE_UUID');
     $itemUuid = BillingFixtureHelper::value('BILLING_TEST_SUBSCRIPTION_ITEM_UUID');
-
-    [$beforeStatus, $before] = BillingApiHelper::get('billing/seats', $bearer, [
-        'subscription_item_uuid' => $itemUuid,
-        'status' => 'all',
-    ]);
-    expect($beforeStatus)->toBe(200);
+    $before = BillingFixtureHelper::ensureFreeSeatSlotUnassigned($bearer);
     $items = $before['data']['items'] ?? [];
-    $beforeBySlot = array_column($items, null, 'seat_slot_uuid');
-    if (($beforeBySlot[$slotUuid]['slot_status'] ?? null) !== 'unassigned') {
-        $this->markTestSkipped('Configured BILLING_TEST_FREE_SEAT_SLOT_UUID is not currently unassigned.');
-    }
 
     $secondSlotUuid = null;
     foreach ($items as $row) {
