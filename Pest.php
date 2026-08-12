@@ -13,7 +13,33 @@
 
 // pest()->extend(Tests\TestCase::class)->in('Feature');
 
-require_once __DIR__ . '/tests_config.php';
+// Audit logging is a side effect of several otherwise isolated unit-test
+// paths. Keep those writes in memory so tests neither require access to the
+// production audit directory nor leave log files behind.
+define('RA_AUDIT_LOG_FILE', 'php://memory');
+
+// The application config loaded by tests_config.php defines the audit path
+// unconditionally. Ignore only that expected duplicate-definition warning;
+// all other bootstrap warnings continue through Pest's error handler.
+$previousErrorHandler = set_error_handler(
+    static function (int $severity, string $message, string $file, int $line) use (&$previousErrorHandler): bool {
+        if ($severity === E_WARNING && $message === 'Constant RA_AUDIT_LOG_FILE already defined') {
+            return true;
+        }
+
+        return is_callable($previousErrorHandler)
+            ? (bool) $previousErrorHandler($severity, $message, $file, $line)
+            : false;
+    }
+);
+
+try {
+    require_once __DIR__ . '/tests_config.php';
+} finally {
+    restore_error_handler();
+    unset($previousErrorHandler);
+}
+
 require_once __DIR__ . '/Support/AccountCompaniesApiHelper.php';
 
 uses()

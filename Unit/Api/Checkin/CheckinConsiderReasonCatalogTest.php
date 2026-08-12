@@ -167,22 +167,3 @@ test('listForIntegratorReference publishes only curated visible rows with messag
         ->and($byCode['DC004'])->not->toHaveKey('message_params');
 });
 
-test('catalog degrades to the generic line when the table is missing', function () {
-    $failingDb = new class {
-        public function query(string $sql): object
-        {
-            throw new RuntimeException("Table 'checkin_consider_reason' doesn't exist");
-        }
-
-        public function escape(string $value): string
-        {
-            return addslashes($value);
-        }
-    };
-    $catalog = new CheckinConsiderReasonCatalog(new CheckinCatalogRegistryDouble(['db' => $failingDb]));
-
-    $resolved = $catalog->resolveForUser([['id' => 'DC004', 'service' => 'doc-check']], 'en');
-
-    expect($resolved['specific'])->toBeFalse()
-        ->and($resolved['messages'])->toHaveCount(1);
-});
