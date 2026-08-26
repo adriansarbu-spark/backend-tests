@@ -62,17 +62,34 @@ final class CertificateCrlFlowHelper
         return resolveTestConfig('API_URL') . 'account/certificates';
     }
 
-    public static function certificatesListUrl(int $page = 1, int $perPage = 20): string
-    {
-        return self::certificatesUrl() . '?' . http_build_query([
+    public static function certificatesListUrl(
+        int $page = 1,
+        int $perPage = 20,
+        ?string $usage = null,
+        ?string $status = null
+    ): string {
+        $query = [
             'page' => $page,
             'per_page' => $perPage,
-        ]);
+        ];
+        if ($usage !== null && $usage !== '') {
+            $query['usage'] = $usage;
+        }
+        if ($status !== null && $status !== '') {
+            $query['status'] = $status;
+        }
+
+        return self::certificatesUrl() . '?' . http_build_query($query);
     }
 
     public static function certificatesRequestUrl(): string
     {
         return self::certificatesUrl() . '?request=1';
+    }
+
+    public static function activeCertificatesUrl(): string
+    {
+        return self::certificatesUrl() . '?' . http_build_query(['action' => 'active']);
     }
 
     public static function certificateActionUrl(string $certificateUuid, string $action, ?string $format = null): string
@@ -101,9 +118,120 @@ final class CertificateCrlFlowHelper
     /**
      * @return array{0:int,1:?array,2:string}
      */
-    public static function listCertificates(string $bearer, int $page = 1, int $perPage = 20): array
+    public static function listCertificates(
+        string $bearer,
+        int $page = 1,
+        int $perPage = 20,
+        ?string $usage = null,
+        ?string $status = null
+    ): array {
+        return ApiAuthHelper::apiRequest(
+            'GET',
+            self::certificatesListUrl($page, $perPage, $usage, $status),
+            $bearer
+        );
+    }
+
+    /**
+     * @return array{0:int,1:?array,2:string}
+     */
+    public static function getActiveCertificates(string $bearer): array
     {
-        return ApiAuthHelper::apiRequest('GET', self::certificatesListUrl($page, $perPage), $bearer);
+        return ApiAuthHelper::apiRequest('GET', self::activeCertificatesUrl(), $bearer);
+    }
+
+    /**
+     * Ensure a valid certificate exists for $usage. Issues only when none is valid.
+     * Treats issue `409 certificate_exists` as success after re-list.
+     *
+     * @return array<string,mixed> certificate list row (usage/status/serial/uuid/…)
+     */
+    public static function ensureValidCertificate(string $bearer, string $usage = 'document_signing'): array
+    {
+        $existing = self::findValidCertificateForUsage($bearer, $usage);
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        [$reqStatus, $reqJson, $reqRaw] = self::getIssuancePrerequisites($bearer);
+        if ($reqStatus !== 200 || !is_array($reqJson)) {
+            throw new RuntimeException(
+                'GET certificates?request=1 failed. status=' . $reqStatus . ' raw=' . substr($reqRaw, 0, 800)
+            );
+        }
+
+        $uuids = [];
+        foreach ((array)($reqJson['data']['documents'] ?? []) as $doc) {
+            if (!is_array($doc)) {
+                continue;
+            }
+            $uuid = trim((string)($doc['uuid'] ?? ''));
+            if ($uuid !== '') {
+                $uuids[] = $uuid;
+            }
+        }
+        if ($uuids === []) {
+            throw new RuntimeException('No legal document UUIDs returned from certificates?request=1.');
+        }
+
+        $lastIssueDebug = '';
+        $maxIssueAttempts = 4;
+        for ($attempt = 1; $attempt <= $maxIssueAttempts; $attempt++) {
+            if ($attempt > 1) {
+                // Wait for a fresh TOTP window on invalid_totp / issuance_failed retries.
+                usleep(2_000_000);
+            }
+
+            [$issueStatus, $issueJson, $issueRaw] = self::issueCertificate($bearer, $usage, $uuids);
+            $errors = self::joinedErrors($issueJson);
+            $lastIssueDebug = 'attempt=' . $attempt
+                . ' status=' . $issueStatus
+                . ' errors=' . $errors
+                . ' raw=' . substr($issueRaw, 0, 800);
+
+            if ($issueStatus === 409 && str_contains($errors, 'certificate_exists')) {
+                $existing = self::findValidCertificateForUsage($bearer, $usage);
+                if ($existing !== null) {
+                    return $existing;
+                }
+                continue;
+            }
+
+            if ($issueStatus === 200 && is_array($issueJson) && (int)($issueJson['success'] ?? 0) === 1) {
+                break;
+            }
+
+            $retryable = str_contains($errors, 'invalid_totp') || str_contains($errors, 'issuance_failed');
+            if (!$retryable || $attempt === $maxIssueAttempts) {
+                throw new RuntimeException('Certificate issuance failed. ' . $lastIssueDebug);
+            }
+        }
+
+        $pollDeadline = microtime(true) + 90;
+        while (microtime(true) < $pollDeadline) {
+            $existing = self::findValidCertificateForUsage($bearer, $usage);
+            if ($existing !== null) {
+                return $existing;
+            }
+            usleep(1_000_000);
+        }
+
+        throw new RuntimeException(
+            'Valid certificate not observed after issuance within 90s. ' . $lastIssueDebug
+        );
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    public static function findValidCertificateForUsage(string $bearer, string $usage): ?array
+    {
+        [$listStatus, $listJson] = self::listCertificates($bearer, 1, 50, $usage, 'valid');
+        if ($listStatus !== 200 || !is_array($listJson)) {
+            return null;
+        }
+
+        return self::findFirstCertificateInList($listJson, $usage, 'valid');
     }
 
     /**
@@ -167,7 +295,7 @@ final class CertificateCrlFlowHelper
         }
 
         $leafPem = self::derBase64ToPem($derBase64);
-        $issuer = self::resolveIssuerCertPemFromLeaf($leafPem);
+        $issuer = self::resolveIssuerCertPemForCertificate($bearer, $uuid, $usage, $leafPem);
 
         return [
             'leaf_pem' => $leafPem,
@@ -177,6 +305,131 @@ final class CertificateCrlFlowHelper
             'certificate_uuid' => $uuid,
             'usage' => $usage,
         ];
+    }
+
+    /**
+     * Prefer CA issuer from GET ?action=active certificate_chain_pem; fall back to AIA/CDP URL derivation.
+     *
+     * @return array{issuer_pem:string,issuer_source_url:string}
+     */
+    public static function resolveIssuerCertPemForCertificate(
+        string $bearer,
+        string $certificateUuid,
+        string $usage,
+        string $leafPem
+    ): array {
+        $fromChain = self::tryResolveIssuerFromActiveChain($bearer, $certificateUuid, $usage, $leafPem);
+        if ($fromChain !== null) {
+            return $fromChain;
+        }
+
+        return self::resolveIssuerCertPemFromLeaf($leafPem);
+    }
+
+    /**
+     * @return array{issuer_pem:string,issuer_source_url:string}|null
+     */
+    public static function tryResolveIssuerFromActiveChain(
+        string $bearer,
+        string $certificateUuid,
+        string $usage,
+        string $leafPem
+    ): ?array {
+        [$status, $json] = self::getActiveCertificates($bearer);
+        if ($status !== 200 || !is_array($json)) {
+            return null;
+        }
+
+        $chainPem = '';
+        foreach ((array)($json['data']['certificates'] ?? []) as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $rowUuid = (string)($row['certificate_uuid'] ?? '');
+            $rowUsage = (string)($row['usage'] ?? '');
+            $matchesUuid = $certificateUuid !== '' && strcasecmp($rowUuid, $certificateUuid) === 0;
+            $matchesUsage = $usage !== '' && $rowUsage === $usage;
+            if (!$matchesUuid && !$matchesUsage) {
+                continue;
+            }
+            $chainPem = trim((string)($row['certificate_chain_pem'] ?? ''));
+            if ($chainPem !== '') {
+                break;
+            }
+        }
+
+        if ($chainPem === '') {
+            return null;
+        }
+
+        $chainCerts = self::splitPemCertificates($chainPem);
+        if ($chainCerts === []) {
+            return null;
+        }
+
+        $crlUrls = self::extractCrlDistributionPointUrlsFromCertPem($leafPem);
+        foreach ($crlUrls as $crlUrl) {
+            $download = self::downloadPkixResource($crlUrl, 'crl');
+            if (!empty($download['retryable']) || !empty($download['error'])) {
+                continue;
+            }
+
+            $crlBody = (string)$download['body'];
+            if ($crlBody === '' || !self::isCrlBody($crlBody)) {
+                continue;
+            }
+
+            $crlX509 = new SamX509();
+            if ($crlX509->loadCRL(self::normalizeCrlBody($crlBody)) === false) {
+                continue;
+            }
+
+            foreach ($chainCerts as $candidatePem) {
+                $issuerX509 = new SamX509();
+                if ($issuerX509->loadX509($candidatePem) === false) {
+                    continue;
+                }
+                if (!self::crlIssuerMatchesCaSubject($crlX509, $issuerX509)) {
+                    continue;
+                }
+
+                $verifyX509 = new SamX509();
+                $verifyX509->loadCA($candidatePem);
+                if ($verifyX509->loadCRL(self::normalizeCrlBody($crlBody)) === false) {
+                    continue;
+                }
+                if ($verifyX509->validateSignature(true) !== true) {
+                    continue;
+                }
+
+                return [
+                    'issuer_pem' => $candidatePem,
+                    'issuer_source_url' => 'active_certificate_chain_pem',
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function splitPemCertificates(string $pemBundle): array
+    {
+        if (preg_match_all('/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/', $pemBundle, $matches) < 1) {
+            return [];
+        }
+
+        $certs = [];
+        foreach ($matches[0] as $pem) {
+            $pem = trim((string)$pem);
+            if ($pem !== '') {
+                $certs[] = $pem . "\n";
+            }
+        }
+
+        return $certs;
     }
 
     /**
@@ -854,75 +1107,37 @@ final class CertificateCrlFlowHelper
      */
     public static function reissueFreshCertificate(string $bearer, string $usage, string $previousSerial): array
     {
-        $debugLines = [];
-
-        [$reqStatus, $reqJson, $reqRaw] = self::getIssuancePrerequisites($bearer);
-        if ($reqStatus !== 200 || !is_array($reqJson)) {
-            return [
-                'ok' => false,
-                'new_serial_number' => '',
-                'debug' => 'GET certificates/request failed. status=' . $reqStatus . ' raw=' . substr($reqRaw, 0, 800),
-            ];
-        }
-
-        $uuids = [];
-        foreach ((array)($reqJson['data']['documents'] ?? []) as $doc) {
-            if (!is_array($doc)) {
-                continue;
+        try {
+            $certificate = self::ensureValidCertificate($bearer, $usage);
+            $newSerial = (string)($certificate['serial_number'] ?? '');
+            if ($newSerial === '') {
+                return [
+                    'ok' => false,
+                    'new_serial_number' => '',
+                    'debug' => 'ensureValidCertificate returned a certificate without serial_number.',
+                ];
             }
-            $uuid = trim((string)($doc['uuid'] ?? ''));
-            if ($uuid !== '') {
-                $uuids[] = $uuid;
+
+            if ($previousSerial !== '' && self::serialNumbersEqual($newSerial, $previousSerial)) {
+                return [
+                    'ok' => false,
+                    'new_serial_number' => $newSerial,
+                    'debug' => 'ensureValidCertificate returned the previous serial; expected a fresh certificate after revoke.',
+                ];
             }
-        }
 
-        if ($uuids === []) {
+            return [
+                'ok' => true,
+                'new_serial_number' => $newSerial,
+                'debug' => 'ensureValidCertificate ok; new_serial_number=' . $newSerial,
+            ];
+        } catch (Throwable $e) {
             return [
                 'ok' => false,
                 'new_serial_number' => '',
-                'debug' => 'No legal document UUIDs returned from certificates/request.',
+                'debug' => 'ensureValidCertificate failed: ' . $e->getMessage(),
             ];
         }
-
-        [$issueStatus, $issueJson, $issueRaw] = self::issueCertificate($bearer, $usage, $uuids);
-        $debugLines[] = 'issue status=' . $issueStatus . ' errors=' . self::joinedErrors($issueJson);
-        if ($issueStatus !== 200 || !is_array($issueJson) || (int)($issueJson['success'] ?? 0) !== 1) {
-            return [
-                'ok' => false,
-                'new_serial_number' => '',
-                'debug' => implode("\n", $debugLines) . "\nissue raw=" . substr($issueRaw, 0, 800),
-            ];
-        }
-
-        $newSerial = '';
-        $attempts = 12;
-        $sleepMs = 500;
-        for ($i = 0; $i < $attempts; $i++) {
-            [$listStatus, $listJson] = self::listCertificates($bearer);
-            if ($listStatus === 200 && is_array($listJson)) {
-                $cert = self::findFirstCertificateInList($listJson, $usage, 'valid');
-                $serial = (string)($cert['serial_number'] ?? '');
-                if ($serial !== '' && strcasecmp($serial, $previousSerial) !== 0) {
-                    $newSerial = $serial;
-                    break;
-                }
-            }
-            usleep($sleepMs * 1000);
-        }
-
-        if ($newSerial === '') {
-            return [
-                'ok' => false,
-                'new_serial_number' => '',
-                'debug' => implode("\n", $debugLines) . "\nnew certificate serial not observed after reissue.",
-            ];
-        }
-
-        return [
-            'ok' => true,
-            'new_serial_number' => $newSerial,
-            'debug' => implode("\n", $debugLines) . "\nnew_serial_number={$newSerial}",
-        ];
     }
 
     /**
@@ -1078,8 +1293,36 @@ final class CertificateCrlFlowHelper
     private static function downloadPkixResource(string $url, string $resourceLabel = 'resource'): array
     {
         $timeoutSec = defined('CRL_DOWNLOAD_TIMEOUT_SEC') ? (int)CRL_DOWNLOAD_TIMEOUT_SEC : 10;
-        $requestUrl = self::appendCacheBustingQueryParam($url);
+        $cacheBustedUrl = self::appendCacheBustingQueryParam($url);
+        $result = self::downloadPkixResourceOnce($cacheBustedUrl, $resourceLabel, $timeoutSec);
 
+        // Some PKI hosts reject unknown query params; retry the unmodified CDP/AIA URL.
+        if (
+            $cacheBustedUrl !== $url
+            && (
+                (int)$result['http_status'] === 404
+                || (
+                    $result['error'] !== null
+                    && !$result['retryable']
+                    && (int)$result['http_status'] >= 400
+                    && (int)$result['http_status'] < 500
+                )
+            )
+        ) {
+            $retry = self::downloadPkixResourceOnce($url, $resourceLabel, $timeoutSec);
+            if ($retry['error'] === null) {
+                return $retry;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return array{http_status:int,body:string,error:?string,retryable:bool,raw:string}
+     */
+    private static function downloadPkixResourceOnce(string $requestUrl, string $resourceLabel, int $timeoutSec): array
+    {
         try {
             $response = ApiAuthHelper::guzzleRequest('GET', $requestUrl, [
                 'headers' => [
@@ -1089,6 +1332,8 @@ final class CertificateCrlFlowHelper
             ], [
                 'timeout' => max(1, $timeoutSec),
                 'allow_redirects' => true,
+                // CRL/CA hosts are not on the agent/dev proxy allowlist; env proxy would hang.
+                'proxy' => false,
             ]);
         } catch (Throwable $e) {
             return [
@@ -1325,7 +1570,18 @@ final class CertificateCrlFlowHelper
         }
 
         $revokedSerials = $crlX509->listRevoked();
-        $isRevoked = $crlX509->getRevoked(self::serialToBigInteger($leafSerial)->toString()) !== false;
+        $isRevoked = false;
+        if (is_array($revokedSerials)) {
+            foreach ($revokedSerials as $revokedSerial) {
+                if (self::serialNumbersEqual((string)$revokedSerial, $leafSerial)) {
+                    $isRevoked = true;
+                    break;
+                }
+            }
+        }
+        if (!$isRevoked) {
+            $isRevoked = $crlX509->getRevoked(self::serialToBigInteger($leafSerial)->toString()) !== false;
+        }
 
         $status = $isRevoked ? 'revoked' : 'good';
         $logLines[] = 'leaf_serial_canonical=' . self::canonicalSerialHex($leafSerial);
