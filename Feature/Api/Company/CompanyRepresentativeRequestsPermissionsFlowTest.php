@@ -97,7 +97,7 @@ test('Company representative-requests - POST create requires company admin or st
  * Steps:
  * 1. Read a real **`request_uuid`** from user A’s list.
  * 2. As user B, **GET** `/publicapi/v1/company/representative-requests/{request_uuid}`.
- * 3. Expect **HTTP 404** **`representative_request_not_found`** (no cross-tenant leakage).
+ * 3. Expect **HTTP 404** **`user_not_found`** (no cross-tenant leakage).
  */
 test('Company representative-requests - outsider cannot load another company’s request by UUID', function () use ($pickUser1RequestUuid) {
     $bearer1 = CompanyRepresentativeApiHelper::bearerTokenForUser1AsCompanyRepresentative();
@@ -120,7 +120,7 @@ test('Company representative-requests - outsider cannot load another company’s
 
     expect($status)->toBe(404, $debug);
     if (is_array($json) && CompanyRepresentativeApiHelper::joinedErrors($json) !== '') {
-        expect(CompanyRepresentativeApiHelper::joinedErrors($json))->toContain('representative_request_not_found');
+        expect(CompanyRepresentativeApiHelper::joinedErrors($json))->toContain('user_not_found');
     }
 });
 
@@ -130,7 +130,7 @@ test('Company representative-requests - outsider cannot load another company’s
  *
  * Steps:
  * 1. As user B, **POST** `/publicapi/v1/company/representative-requests/{request_uuid}/cancel`.
- * 2. Expect **not HTTP 200** — typically **HTTP 404** **`representative_request_not_found`** or **HTTP 409** **`representative_request_not_cancellable`** if the row were somehow visible but not cancellable; must **not** return **HTTP 200** with **`cancelled`** true for another tenant’s row.
+ * 2. Expect **not HTTP 200** — typically **HTTP 404** **`user_not_found`** or **HTTP 409** **`representative_request_not_cancellable`** if the row were somehow visible but not cancellable; must **not** return **HTTP 200** with **`cancelled`** true for another tenant’s row.
  */
 test('Company representative-requests - outsider cannot cancel another company’s request by UUID', function () use ($pickUser1RequestUuid) {
     $bearer1 = CompanyRepresentativeApiHelper::bearerTokenForUser1AsCompanyRepresentative();
@@ -158,7 +158,7 @@ test('Company representative-requests - outsider cannot cancel another company�
         expect(CompanyRepresentativeApiHelper::joinedErrors($json))->toContain('admin_role_required');
     }
     if ($status === 404 && is_array($json) && CompanyRepresentativeApiHelper::joinedErrors($json) !== '') {
-        expect(CompanyRepresentativeApiHelper::joinedErrors($json))->toContain('representative_request_not_found');
+        expect(CompanyRepresentativeApiHelper::joinedErrors($json))->toContain('user_not_found');
     }
     if ($status === 409 && is_array($json) && CompanyRepresentativeApiHelper::joinedErrors($json) !== '') {
         expect(CompanyRepresentativeApiHelper::joinedErrors($json))->toContain('representative_request_not_cancellable');
