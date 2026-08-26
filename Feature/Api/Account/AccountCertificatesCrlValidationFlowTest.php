@@ -37,33 +37,23 @@ beforeAll(function () {
 
 /**
  * Prerequisites:
- * - `TEST_USER_1` has a valid active certificate with Authority Information Access and CRL distribution point URLs.
- * - The CA issuer and CRL endpoints are reachable from the test runner.
+ * - `TEST_USER_1` can authenticate; a valid `document_signing` certificate exists or can be issued.
+ * - The CA issuer and CRL endpoints are reachable from the test runner (no env proxy).
  *
  * Steps:
- * 1. Sign in as `TEST_USER_1` and **GET** `/publicapi/v1/account/certificates`; pick the first valid `document_signing` certificate.
- * 2. **GET** `/publicapi/v1/account/certificates?certificate_uuid=…&action=download&format=cer` for leaf PEM material.
- * 3. Download the CRL from the leaf certificate's distribution point and resolve the CRL signing CA certificate.
- * 4. Inspect leaf and CRL-signing CA certificates (subject, issuer, serial, dates, CRL distribution point URL on the leaf).
- * 5. Download and validate the CRL from the URL embedded in the leaf certificate.
- * 6. Assert the CRL status is **`good`** (serial not revoked), the CRL signature verifies, and `thisUpdate` / `nextUpdate` meet configured thresholds.
+ * 1. Sign in as `TEST_USER_1` and ensure a valid `document_signing` certificate exists (issue only if none).
+ * 2. **GET** download for leaf PEM; resolve CRL signing CA from active `certificate_chain_pem` (AIA/CDP fallback).
+ * 3. Download and validate the CRL from the leaf distribution point.
+ * 4. Assert status **`good`**, signature verifies, and `thisUpdate` / `nextUpdate` meet thresholds.
+ * 5. Never revoke.
  */
 test('Certificates CRL - TEST_USER_1 valid certificate is not revoked in a valid signed CRL', function () {
     $bearer = CertificateCrlFlowHelper::bearerForUser1();
 
-    [$listStatus, $listJson, $listRaw] = CertificateCrlFlowHelper::listCertificates($bearer);
-    $listDebug = 'status=' . $listStatus . ' raw=' . substr($listRaw, 0, 800);
-    expect($listStatus)->toBe(200, 'GET account/certificates list failed. ' . $listDebug);
-    expect(is_array($listJson))->toBeTrue('GET account/certificates returned non-JSON. ' . $listDebug);
-
-    $certificate = CertificateCrlFlowHelper::findFirstCertificateInList(
-        $listJson,
-        'document_signing',
-        'valid'
-    );
-    expect($certificate)->not->toBeNull(
-        'No valid document_signing certificate found in account/certificates list. ' . $listDebug
-    );
+    $certificate = CertificateCrlFlowHelper::ensureValidCertificate($bearer, 'document_signing');
+    expect($certificate)->toBeArray('ensureValidCertificate did not return a certificate row.');
+    expect((string)($certificate['certificate_uuid'] ?? ''))->not->toBe('');
+    expect((string)($certificate['serial_number'] ?? ''))->not->toBe('');
 
     $material = CertificateCrlFlowHelper::certificateMaterialForCrl($bearer, $certificate);
     $leafPem = $material['leaf_pem'];
@@ -73,7 +63,7 @@ test('Certificates CRL - TEST_USER_1 valid certificate is not revoked in a valid
 
     expect($serial)->not->toBe('', 'Selected certificate is missing serial_number.');
     expect($leafPem)->not->toBe('', 'Download did not yield leaf PEM.');
-    expect($issuerPem)->not->toBe('', 'Could not resolve CA issuer PEM from downloaded leaf certificate.');
+    expect($issuerPem)->not->toBe('', 'Could not resolve CA issuer PEM for CRL validation.');
 
     $validation = CertificateCrlFlowHelper::validateCrlForCertificate(
         $leafPem,
@@ -85,7 +75,8 @@ test('Certificates CRL - TEST_USER_1 valid certificate is not revoked in a valid
     expect($validation['ok'])->toBeTrue(
         CertificateCrlFlowHelper::formatCrlValidationFailure(
             $validation,
-            'Expected CRL validation to pass for TEST_USER_1 certificate serial=' . $serial . '.'
+            'Expected CRL validation to pass for TEST_USER_1 certificate serial=' . $serial
+            . ' issuer_source=' . $issuerSourceUrl . '.'
         )
     );
 
@@ -94,7 +85,4 @@ test('Certificates CRL - TEST_USER_1 valid certificate is not revoked in a valid
     expect($validation['this_update'])->not->toBeNull();
     expect($validation['next_update'])->not->toBeNull();
     expect($validation['threshold_violations'])->toBe([]);
-})->skip(
-    SKIP_CRL_VALIDATION_TESTS,
-    'CRL validation flow is unfinished / intentionally disabled (SKIP_CRL_VALIDATION_TESTS=true).'
-);
+});
