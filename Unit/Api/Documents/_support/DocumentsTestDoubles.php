@@ -320,8 +320,8 @@ if (!class_exists(TestableControllerPublicAPIV1Documents::class)) {
             $m->setAccessible(true);
             return $m->invoke($this, $uuid);
         }
-        public function callAddSigners($uuid) { return $this->addSigners($uuid); }
-        public function callSendDocument($uuid) { return $this->sendDocument($uuid); }
+        public function callAddSigners($uuid) { return $this->callPrivate('addSigners', [$uuid]); }
+        public function callSendDocument($uuid) { return $this->callPrivate('sendDocument', [$uuid]); }
         public function callCancelDocument($uuid) { return $this->callPrivate('cancelDocument', [$uuid]); }
         public function callRemindSigner($uuid) { return $this->callPrivate('remindSigner', [$uuid]); }
         public function callDeleteDocument($uuid) { return $this->callPrivate('deleteDocument', [$uuid]); }

@@ -419,6 +419,9 @@ test('Account API — current-account response exposes derived data but removes 
         'totp_secret',
         'cert_requested',
         'custom_field',
+        // Pen-test F015: derived SSO fields were intentionally stripped from GET /account.
+        'sso_email',
+        'authEndpoint',
     ];
 
     expect($controller->statusCode)->toBe(200)
@@ -435,8 +438,6 @@ test('Account API — current-account response exposes derived data but removes 
         ->and($data['duplicate_account_emails'])->toHaveCount(2)
         ->and($data['picture_url'])->toContain('/v1/account/profile-avatar/')
         ->and($data['citizenship'])->toBe('RO')
-        ->and($data['sso_email'])->toBe('sso.user@example.com')
-        ->and($data['authEndpoint'])->toBe('keycloak')
         ->and($data['dual_cert_mode'])->toBe('best_effort')
         ->and($data['language_code'])->toBe('ro-ro')
         ->and($data['data_exports'])->toHaveCount(1)

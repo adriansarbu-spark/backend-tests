@@ -38,12 +38,14 @@ function billing_me_fixture(array $dbRows = [], array $overrides = []): array
             'computeFifoAvailableRemaining' => static fn (int $roleId, string $code): int => $code === 'alpha' ? 7 : 2,
             'getActiveGrantTotalsByRolePooled' => ['alpha' => 1, 'pooled_only' => 1],
             'computeFifoAvailableRemainingPooled' => static fn (int $roleId, string $code): int => $code === 'alpha' ? 12 : 4,
+            'getPooledActiveRoleIds' => [30],
         ]),
         'usage' => $overrides['usage'] ?? new BillingModelStub([
             'sumForRoleEntitlementAllTime' => static fn (int $roleId, string $code): int => 3,
         ]),
         'assignment' => $overrides['assignment'] ?? new BillingModelStub([
             'roleHasAuthenticationRights' => true,
+            'rolesWithAuthenticationRights' => [],
         ]),
         'price' => $overrides['price'] ?? new BillingModelStub([
             'getPriceProductDisplayRow' => static fn (int $priceId): array => [
@@ -137,7 +139,10 @@ test('Billing me — method and permission failures precede snapshot lookup', fu
  * 3. Assert cross-role spendability includes pooled-only codes.
  */
 test('Billing me — effective entitlements and cross-role spendability are stable', function (bool $hasAuthRights) {
-    $assignment = new BillingModelStub(['roleHasAuthenticationRights' => $hasAuthRights]);
+    $assignment = new BillingModelStub([
+        'roleHasAuthenticationRights' => $hasAuthRights,
+        'rolesWithAuthenticationRights' => [],
+    ]);
     [$controller] = billing_me_fixture(overrides: ['assignment' => $assignment]);
     $controller->index();
 
@@ -164,6 +169,11 @@ test('Billing me — effective entitlements and cross-role spendability are stab
         ->and($controller->json['data']['spendable_across_roles'])->toBe([
             'alpha' => ['current_role' => 7, 'other_roles' => 5, 'total' => 12],
             'pooled_only' => ['current_role' => 2, 'other_roles' => 2, 'total' => 4],
+            'authentication_rights' => [
+                'current_role' => $hasAuthRights ? 1 : 0,
+                'other_roles' => 0,
+                'total' => $hasAuthRights ? 1 : 0,
+            ],
         ]);
 })->with([true, false]);
 
@@ -278,7 +288,7 @@ test('Billing me — assigned plan rows safely fall back to parent and nullable 
  *
  * Steps:
  * 1. Request the current-role snapshot.
- * 2. Assert stable IDs, synthetic rights, empty limits/subscriptions/spendability, and null current plan.
+ * 2. Assert stable IDs, synthetic rights, empty limits/subscriptions, authentication spendability, and null current plan.
  */
 test('Billing me — an empty role still receives a stable snapshot', function () {
     $resolver = new BillingModelStub([
@@ -288,8 +298,12 @@ test('Billing me — an empty role still receives a stable snapshot', function (
     $grant = new BillingModelStub([
         'getActiveGrantTotalsByRole' => [],
         'getActiveGrantTotalsByRolePooled' => [],
+        'getPooledActiveRoleIds' => [30],
     ]);
-    $assignment = new BillingModelStub(['roleHasAuthenticationRights' => false]);
+    $assignment = new BillingModelStub([
+        'roleHasAuthenticationRights' => false,
+        'rolesWithAuthenticationRights' => [],
+    ]);
     [$controller] = billing_me_fixture(overrides: [
         'resolver' => $resolver,
         'grant' => $grant,
@@ -309,7 +323,13 @@ test('Billing me — an empty role still receives a stable snapshot', function (
             'remaining' => 0,
         ]],
         'limits' => [],
-        'spendable_across_roles' => [],
+        'spendable_across_roles' => [
+            'authentication_rights' => [
+                'current_role' => 0,
+                'other_roles' => 0,
+                'total' => 0,
+            ],
+        ],
         'subscriptions' => [],
         'current_plan' => null,
     ]);
