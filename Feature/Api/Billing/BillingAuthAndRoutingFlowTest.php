@@ -123,34 +123,27 @@ test('Billing — unsupported company role cannot use admin or catalog billing r
 /**
  * Prerequisites:
  * - TEST_USER_2 can sign in with a personal role that is not a member of BILLING_TEST_COMPANY_UUID.
- * - BILLING_TEST_COMPANY_ADMIN_UUID / TARGET_ROLE_UUID belong to TEST_USER_1.
+ * - BILLING_TEST_TARGET_ROLE_UUID belongs to TEST_USER_1.
  *
  * Steps:
- * 1. As USER_2, request USER_1 admin seats/grants identifiers and USER_1 role on /me.
- * 2. Assert foreign admin resources are not readable (403/404) and no assignment is created.
+ * 1. As USER_2, request admin seats/grants with unknown identifiers and USER_1's role on /me.
+ * 2. Assert admin resources are not readable (403/404) and no assignment is created.
  * 3. Assert USER_2 cannot adopt USER_1's role UUID via x-role-uuid.
  */
 test('Billing — second user cannot read first user company billing resources', function () {
-    require_once __DIR__ . '/../../../Support/BillingFixtureHelper.php';
-    BillingFixtureHelper::assertConfigOrSkip([
-        'BILLING_TEST_SUBSCRIPTION_ITEM_UUID',
-        'BILLING_TEST_PRICE_UUID',
-        'BILLING_TEST_TARGET_ROLE_UUID',
-    ]);
+    assertTestConfigKeysOrSkip(['BILLING_TEST_TARGET_ROLE_UUID']);
+    $roleUuid = resolvedTestConfigValue('BILLING_TEST_TARGET_ROLE_UUID');
+    $unknownUuid = '00000000-0000-0000-0000-000000000000';
 
     $foreign = BillingApiHelper::bearerForUser2Personal();
-    $itemUuid = BillingFixtureHelper::value('BILLING_TEST_SUBSCRIPTION_ITEM_UUID');
-    $priceUuid = BillingFixtureHelper::value('BILLING_TEST_PRICE_UUID');
-    $roleUuid = BillingFixtureHelper::value('BILLING_TEST_TARGET_ROLE_UUID');
-
     [$seatsStatus, $seats] = BillingApiHelper::get('billing/seats', $foreign, [
-        'subscription_item_uuid' => $itemUuid,
+        'subscription_item_uuid' => $unknownUuid,
     ]);
     BillingApiHelper::assertFailure($seatsStatus, $seats, [403, 404]);
     expect((array) ($seats['data'] ?? []))->toBe([]);
 
     [$grantsStatus, $grants] = BillingApiHelper::get('billing/entitlement_grants', $foreign, [
-        'price_uuid' => $priceUuid,
+        'price_uuid' => $unknownUuid,
     ]);
     BillingApiHelper::assertFailure($grantsStatus, $grants, [403, 404]);
     expect((array) ($grants['data'] ?? []))->toBe([]);

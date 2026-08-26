@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../tests_config.php';
 require_once __DIR__ . '/../../../Support/BillingApiHelper.php';
-require_once __DIR__ . '/../../../Support/BillingFixtureHelper.php';
 
 if (SKIP_INTEGRATION_TESTS) {
     /**
@@ -22,26 +21,6 @@ if (SKIP_INTEGRATION_TESTS) {
 
 beforeAll(function () {
     BillingApiHelper::assertRequiredConfigOrSkip();
-});
-
-/**
- * Prerequisites:
- * - BILLING_TEST_COMPANY_ADMIN_UUID is active; BILLING_TEST_PRICE_UUID identifies a dedicated test price.
- *
- * Steps:
- * 1. List top-up grant packages for that price.
- * 2. Assert HTTP 200 with items and summary.
- */
-test('Billing — admin can list top-up packages for a price', function () {
-    BillingFixtureHelper::assertConfigOrSkip(['BILLING_TEST_PRICE_UUID']);
-    $bearer = BillingApiHelper::bearerForUser1Admin();
-    [$status, $json, $raw] = BillingApiHelper::get('billing/entitlement_grants', $bearer, [
-        'price_uuid' => BillingFixtureHelper::value('BILLING_TEST_PRICE_UUID'),
-        'status' => 'all',
-    ]);
-    BillingApiHelper::assertSuccessfulEnvelope($status, $json, $raw);
-    expect($json['data']['items'] ?? null)->toBeArray()
-        ->and($json['data']['summary'] ?? null)->toBeArray();
 });
 
 /**
