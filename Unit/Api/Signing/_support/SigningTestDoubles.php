@@ -62,11 +62,25 @@ if (!class_exists('ModelSigningSigner', false)) {
 if (!class_exists('ModelCertificateCertificate', false)) {
     class ModelCertificateCertificate {
         public const USAGE_DOCUMENT_SIGNING = 'document_signing';
+
+        public const USAGE_CLIENT_AUTHENTICATION = 'client_authentication';
+
+        public static function normalizeUsageType($usage): ?string
+        {
+            $usage = strtolower(trim((string) $usage));
+
+            return in_array($usage, [self::USAGE_DOCUMENT_SIGNING, self::USAGE_CLIENT_AUTHENTICATION], true)
+                ? $usage
+                : null;
+        }
     }
 }
 
 // signing.php / SigningWorkflow call \ModelSigningAuditEvent statics and ->record()
 // without bootstrapping catalog/model/signing/audit_event.php in unit tests.
+// Pest runs all unit tests in one process, so this stub may also serve the Documents
+// tests (or vice versa). Keep it a superset identical to the one in
+// tests/Unit/Api/Documents/_support/DocumentsTestDoubles.php.
 if (!class_exists('ModelSigningAuditEvent', false)) {
     class ModelSigningAuditEvent {
         public const EVENT_SENT = 'sent';
@@ -87,6 +101,16 @@ if (!class_exists('ModelSigningAuditEvent', false)) {
                 'event_type'         => (string)$event_type,
                 'meta'               => $meta,
             ];
+        }
+
+        public function isCertificateAvailable(array $document, bool $hasEvents = false): bool
+        {
+            return false;
+        }
+
+        public function documentIdsWithEvents(array $ids): array
+        {
+            return [];
         }
 
         /**
@@ -281,4 +305,3 @@ if (!class_exists(TestCustomerWithIds::class)) {
         public function getLastName() {}
     }
 }
-

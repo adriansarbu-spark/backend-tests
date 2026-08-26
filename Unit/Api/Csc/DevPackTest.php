@@ -192,3 +192,69 @@ test('CSC dev pack — unknown item returns 404', function () {
     expect($c->statusCode)->toBe(404)
         ->and($c->json['error'])->toBe(['dev_pack_item_not_found']);
 });
+
+/**
+ * Prerequisites:
+ * - The checked-in CSC developer manifest points at production documentation assets.
+ *
+ * Steps:
+ * 1. Inspect every manifest filename and read every non-generated resource through the containment helper.
+ * 2. Attempt traversal and missing-file reads through the same helper.
+ * 3. Assert only manifest-safe names and in-root files are accepted.
+ */
+test('CSC dev pack — manifest resources stay inside docs and use safe zip names', function () {
+    $client = new CscApiClientModelStub();
+    $client->byCompany = ['api_client_uuid' => 'u1', 'keycloak_client_id' => 'sim_api_u1'];
+    $controller = csc_dev_pack_controller(new CscApiCustomerStub(1, 10, 5), $client);
+    $itemsProperty = new ReflectionProperty(ControllerPublicAPIV1CscDevPack::class, 'static_items');
+    $itemsProperty->setAccessible(true);
+    $items = $itemsProperty->getValue();
+    $loadFile = new ReflectionMethod(ControllerPublicAPIV1CscDevPack::class, 'loadDocFile');
+    $loadFile->setAccessible(true);
+
+    foreach ($items as $key => $meta) {
+        expect($meta['name'])->not->toContain('/')
+            ->and($meta['name'])->not->toContain('..');
+        if ($key !== 'reference') {
+            expect($loadFile->invoke($controller, $meta['file']))->toBeString()->not->toBe('');
+        }
+    }
+
+    expect($loadFile->invoke($controller, '../config.php'))->toBeNull()
+        ->and($loadFile->invoke($controller, 'devpack/does-not-exist.txt'))->toBeNull();
+});
+
+/**
+ * Prerequisites:
+ * - A provisioned CSC client has one allowlisted redirect and includes secret/foreign-looking fixture fields.
+ *
+ * Steps:
+ * 1. Personalize the checked-in Postman environment for the active client.
+ * 2. Assert only the public OAuth client ID and owned redirect URI are substituted.
+ * 3. Assert client/webhook secrets, file paths, and foreign identifiers are absent.
+ */
+test('CSC dev pack — personalized environment exposes only owned public client configuration', function () {
+    $redirect = new CscRedirectUriModelStub();
+    $redirect->uris = [['uri' => 'https://client.example.test/callback']];
+    [$registry] = csc_integrator_registry(redirect: $redirect);
+    $controller = new TestableControllerPublicAPIV1CscDevPack($registry);
+    $method = new ReflectionMethod(ControllerPublicAPIV1CscDevPack::class, 'personalizedEnvironmentJson');
+    $method->setAccessible(true);
+    $raw = $method->invoke($controller, [
+        'csc_api_client_id' => 51,
+        'keycloak_client_id' => 'oauth-public-client',
+        'name' => 'Owned client',
+        'client_secret' => 'must-not-leak',
+        'webhook_secret' => 'also-must-not-leak',
+        'foreign_client_id' => 'foreign-must-not-leak',
+    ]);
+    $environment = json_decode((string) $raw, true);
+    $values = array_column($environment['values'] ?? [], 'value', 'key');
+
+    expect($environment['name'])->toBe('Simplifi CSC — Owned client')
+        ->and($values['oauth_client_id'] ?? null)->toBe('oauth-public-client')
+        ->and($values['redirect_uri'] ?? null)->toBe('https://client.example.test/callback')
+        ->and($raw)->not->toContain('must-not-leak')
+        ->and($raw)->not->toContain('foreign-must-not-leak')
+        ->and($raw)->not->toContain(DIR_SYSTEM);
+});

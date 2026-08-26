@@ -242,6 +242,7 @@ final class ReferralsConfigStub
         return match ($key) {
             'referral_remind_cooldown_seconds' => $this->remindCooldownSeconds,
             'config_language_id' => $this->languageId,
+            'mailgun_max_retries' => 0,
             default => null,
         };
     }
@@ -296,6 +297,15 @@ final class ReferralModelStub
     public ?string $lastRemindForReferral = null;
 
     public ?string $lastInviteRemindForEmail = null;
+
+    /** @var array<string, mixed>|null */
+    public ?array $lastInviteSendRecord = null;
+
+    /** @var list<array{referrer_id: int, referral_id: int, email: string, status: string}> */
+    public array $remindRecords = [];
+
+    /** @var list<array{referrer_id: int, email: string, status: string}> */
+    public array $inviteRemindRecords = [];
 
     public function listReferralActivityForReferrerPaged(
         int $referrer_id,
@@ -375,6 +385,16 @@ final class ReferralModelStub
         $ip,
         $ua,
     ): array {
+        $this->lastInviteSendRecord = compact(
+            'referrer_id',
+            'invite_id',
+            'email',
+            'status',
+            'error_message',
+            'ip',
+            'ua',
+        );
+
         return $this->recordInviteSendResult;
     }
 
@@ -400,10 +420,47 @@ final class ReferralModelStub
 
     public function recordRemindSend(int $referrer_id, int $referral_id, string $email, string $status): void
     {
+        $this->remindRecords[] = compact('referrer_id', 'referral_id', 'email', 'status');
     }
 
     public function recordInviteRemindSend(int $referrer_id, string $email, string $status): void
     {
+        $this->inviteRemindRecords[] = compact('referrer_id', 'email', 'status');
+    }
+}
+
+final class ReferralsLanguageModelStub
+{
+    public function getLanguages(): array
+    {
+        return ['en-gb' => ['language_id' => 1]];
+    }
+}
+
+final class ReferralsDbStub
+{
+    /** @var list<string> */
+    public array $queries = [];
+
+    public function __construct(public int $lastId = 1)
+    {
+    }
+
+    public function query(string $sql): object
+    {
+        $this->queries[] = $sql;
+
+        return (object) ['num_rows' => 0, 'row' => [], 'rows' => []];
+    }
+
+    public function escape(string $value): string
+    {
+        return addslashes($value);
+    }
+
+    public function getLastId(): int
+    {
+        return $this->lastId;
     }
 }
 
@@ -443,6 +500,12 @@ final class ReferralsLoadStub
     /** @var list<string> */
     public array $loadedModels = [];
 
+    /** @var list<string> */
+    public array $loadedLibraries = [];
+
+    /** @var list<string> */
+    public array $loadedControllers = [];
+
     public function __construct(
         private readonly Registry $registry,
         private readonly ReferralModelStub $referralModel,
@@ -460,7 +523,19 @@ final class ReferralsLoadStub
             $this->registry->set('model_billing_role_entitlement_grant', $this->grantModel);
         } elseif ($route === 'account/customer' && $this->accountCustomerModel !== null) {
             $this->registry->set('model_account_customer', $this->accountCustomerModel);
+        } elseif ($route === 'localisation/language') {
+            $this->registry->set('model_localisation_language', new ReferralsLanguageModelStub());
         }
+    }
+
+    public function library(string $route): void
+    {
+        $this->loadedLibraries[] = $route;
+    }
+
+    public function controller(string $route): void
+    {
+        $this->loadedControllers[] = $route;
     }
 }
 
@@ -473,6 +548,7 @@ function ref_registry_with_models(
     ?RoleEntitlementGrantStub $grantModel = null,
     ?ReferralsAccountCustomerModelStub $accountCustomerModel = null,
     ?ReferralsConfigStub $config = null,
+    ?ReferralsDbStub $db = null,
 ): array {
     $registry = new Registry();
     $load = new ReferralsLoadStub($registry, $referralModel, $grantModel, $accountCustomerModel);
@@ -483,6 +559,7 @@ function ref_registry_with_models(
         'get'    => [],
         'server' => [],
     ]);
+    $registry->set('db', $db ?? new ReferralsDbStub());
 
     return [$registry, $load];
 }

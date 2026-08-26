@@ -32,6 +32,21 @@ if (!class_exists(TestableControllerPublicAPIV1EsignAuthorDocuments::class)) {
         {
             author_docs_invoke_private($this, 'sendDocument', $uuid);
         }
+
+        public function getDocument(string $uuid): void
+        {
+            author_docs_invoke_private($this, 'getDocument', $uuid);
+        }
+
+        public function listDocuments(): void
+        {
+            author_docs_invoke_private($this, 'listDocuments');
+        }
+
+        public function deleteDocument(string $uuid): void
+        {
+            author_docs_invoke_private($this, 'deleteDocument', $uuid);
+        }
     }
 }
 
@@ -107,6 +122,14 @@ final class AuthorDocumentModelStub
 
     public int $createDocumentId = 42;
 
+    public bool $deleteResult = true;
+
+    /** @var array{documents: list<array<string, mixed>>, total: int} */
+    public array $listResult = ['documents' => [], 'total' => 0];
+
+    /** @var list<array<string, mixed>> */
+    public array $calls = [];
+
     /** @var list<array<string, mixed>> */
     public array $parties = [];
 
@@ -143,6 +166,31 @@ final class AuthorDocumentModelStub
 
     public function updateDocument(string $uuid, array $update): void
     {
+    }
+
+    /** @param array<string, mixed> $params */
+    public function listDocuments(array $params): array
+    {
+        $this->calls[] = ['method' => 'listDocuments', 'params' => $params];
+
+        return $this->listResult;
+    }
+
+    public function deleteDocument(string $uuid): bool
+    {
+        $this->calls[] = ['method' => 'deleteDocument', 'uuid' => $uuid];
+
+        return $this->deleteResult;
+    }
+
+    public function applyPartyValues(int $doc_id, array $values): void
+    {
+        $this->calls[] = ['method' => 'applyPartyValues', 'document_id' => $doc_id, 'values' => $values];
+    }
+
+    public function applyFieldValues(int $doc_id, array $values): void
+    {
+        $this->calls[] = ['method' => 'applyFieldValues', 'document_id' => $doc_id, 'values' => $values];
     }
 
     public function getDocumentByIdForUpdate(int $doc_id): ?array
@@ -239,6 +287,16 @@ function author_docs_controller(
     });
     $registry->set('config', $config ?? new AuthorDocumentsConfigStub());
     $registry->set('db', new AuthorDocumentsDbStub());
+    $registry->set('request', (object) ['get' => [], 'server' => []]);
+    $registry->set('response', new class {
+        /** @var list<string> */
+        public array $headers = [];
+
+        public function addHeader(string $header): void
+        {
+            $this->headers[] = $header;
+        }
+    });
 
     $controller = new TestableControllerPublicAPIV1EsignAuthorDocuments($registry);
     $controller->backend_variables = [

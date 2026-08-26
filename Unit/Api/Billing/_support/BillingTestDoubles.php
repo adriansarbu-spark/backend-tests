@@ -2,15 +2,38 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/StripeSdkTestDoubles.php';
 require_once dirname(__DIR__, 4) . '/tests_config.php';
+
+if (!defined('DB_PREFIX')) {
+    define('DB_PREFIX', '');
+}
+
 require_once PUBLIC_API . 'billing/catalog.php';
+require_once PUBLIC_API . 'billing/checkout.php';
 require_once PUBLIC_API . 'billing/company_overview.php';
 require_once PUBLIC_API . 'billing/entitlements.php';
 require_once PUBLIC_API . 'billing/entitlement_grants.php';
 require_once PUBLIC_API . 'billing/ledger_role_consumption.php';
 require_once PUBLIC_API . 'billing/ledger_role_grants.php';
 require_once PUBLIC_API . 'billing/me.php';
+require_once PUBLIC_API . 'billing/portal.php';
 require_once PUBLIC_API . 'billing/seats.php';
+require_once PUBLIC_API . 'billing/subscription_items.php';
+require_once PUBLIC_API . 'billing/subscriptions.php';
+
+if (!class_exists(ModelBillingPrice::class, false)) {
+    final class ModelBillingPrice
+    {
+        public static function isValidPriceUuid(string $uuid): bool
+        {
+            return (bool) preg_match(
+                '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+                $uuid,
+            );
+        }
+    }
+}
 
 trait BillingControllerHarness
 {
@@ -52,6 +75,11 @@ final class TestableControllerPublicapiv1BillingCatalog extends ControllerPublic
     use BillingControllerHarness;
 }
 
+final class TestableControllerPublicapiv1BillingCheckout extends ControllerPublicapiv1BillingCheckout
+{
+    use BillingControllerHarness;
+}
+
 final class TestableControllerPublicapiv1BillingCompanyOverview extends ControllerPublicapiv1BillingCompanyOverview
 {
     use BillingControllerHarness;
@@ -82,7 +110,22 @@ final class TestableControllerPublicapiv1BillingMe extends ControllerPublicapiv1
     use BillingControllerHarness;
 }
 
+final class TestableControllerPublicapiv1BillingPortal extends ControllerPublicapiv1BillingPortal
+{
+    use BillingControllerHarness;
+}
+
 final class TestableControllerPublicapiv1BillingSeats extends ControllerPublicapiv1BillingSeats
+{
+    use BillingControllerHarness;
+}
+
+final class TestableControllerPublicapiv1BillingSubscriptionItems extends ControllerPublicapiv1BillingSubscriptionItems
+{
+    use BillingControllerHarness;
+}
+
+final class TestableControllerPublicapiv1BillingSubscriptions extends ControllerPublicapiv1BillingSubscriptions
 {
     use BillingControllerHarness;
 }
@@ -94,6 +137,9 @@ final class BillingCustomerStub
         private readonly int $companyId = 20,
         private readonly int $roleId = 30,
         private readonly ?string $roleCode = 'admin',
+        private readonly string $email = '',
+        private readonly string $companyName = '',
+        private readonly string $totpSecret = '',
     ) {
     }
 
@@ -115,6 +161,36 @@ final class BillingCustomerStub
     public function getRoleCode(): ?string
     {
         return $this->roleCode;
+    }
+
+    public function getEmail(): string
+    {
+        return $this->email;
+    }
+
+    public function getCompanyName(): string
+    {
+        return $this->companyName;
+    }
+
+    public function getTotpSecret(): string
+    {
+        return $this->totpSecret;
+    }
+
+    public function getCompanyCui(): ?string
+    {
+        return null;
+    }
+
+    public function getCompanyRecom(): string
+    {
+        return '';
+    }
+
+    public function getAddress(string $type): string
+    {
+        return '';
     }
 }
 
@@ -281,10 +357,25 @@ function billing_all_permissions(): array
             'publicapi/v1/billing/seats',
         ],
         'post' => [
+            'publicapi/v1/billing/checkout',
             'publicapi/v1/billing/entitlement_grants',
+            'publicapi/v1/billing/portal',
             'publicapi/v1/billing/seats',
+            'publicapi/v1/billing/subscription_items',
+            'publicapi/v1/billing/subscriptions',
         ],
     ];
+}
+
+/**
+ * @param list<mixed> $arguments
+ */
+function billing_invoke_private(object $object, string $method, array $arguments = []): mixed
+{
+    $reflection = new ReflectionMethod($object, $method);
+    $reflection->setAccessible(true);
+
+    return $reflection->invokeArgs($object, $arguments);
 }
 
 function billing_set_method(string $method): void
