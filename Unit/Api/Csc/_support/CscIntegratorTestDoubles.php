@@ -277,6 +277,27 @@ if (! class_exists(CscEnrollmentSessionModelStub::class)) {
             ++$this->updateScaCalls;
         }
 
+        public int $updateSignerPhoneCalls = 0;
+
+        /** @var array{0: int, 1: string|null, 2: int|null}|null */
+        public ?array $lastUpdateSignerPhoneArgs = null;
+
+        public function updateSignerPhoneOnResume(int $id, ?string $signerPhone, ?int $locked): bool
+        {
+            ++$this->updateSignerPhoneCalls;
+            $this->lastUpdateSignerPhoneArgs = [$id, $signerPhone, $locked];
+            if ($this->inProgressForSigner !== null) {
+                if ($signerPhone !== null && $signerPhone !== '') {
+                    $this->inProgressForSigner['signer_phone'] = $signerPhone;
+                }
+                if ($locked !== null) {
+                    $this->inProgressForSigner['signer_phone_locked'] = $locked;
+                }
+            }
+
+            return true;
+        }
+
         // -------------------------------------------------------------------
         // Hosted enrollment flow (enroll.php) mutators. Each mutates $byToken
         // in place (when set) so a subsequent getByToken() call in the
@@ -573,6 +594,16 @@ if (! class_exists(CscIntegratorDbStub::class)) {
 
         public function query(string $sql): object
         {
+            if (stripos($sql, 'GET_LOCK') !== false) {
+                return (object) [
+                    'num_rows' => 1,
+                    'row'      => ['l' => 1],
+                    'rows'     => [],
+                ];
+            }
+            if (stripos($sql, 'RELEASE_LOCK') !== false) {
+                return (object) ['num_rows' => 1, 'row' => [], 'rows' => []];
+            }
             if (stripos($sql, 'csc_api_client') !== false && stripos($sql, 'SELECT') !== false) {
                 return (object) [
                     'num_rows' => 1,
@@ -590,6 +621,20 @@ if (! class_exists(CscIntegratorDbStub::class)) {
         }
 
         public function getLastId(): int
+        {
+            return 0;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SMS attempt model stub (hosted enrollment send-sms cap checks)
+// ---------------------------------------------------------------------------
+
+if (! class_exists(CscSmsAttemptModelStub::class)) {
+    final class CscSmsAttemptModelStub
+    {
+        public function countSentForContext($context, $context_id): int
         {
             return 0;
         }
@@ -662,6 +707,10 @@ if (! class_exists(CscIntegratorLoadStub::class)) {
                 'legal/document' => $this->registry->set(
                     'model_legal_document',
                     $this->legalDocument ?? new CscLegalDocumentModelStub(),
+                ),
+                'csc/sms_attempt' => $this->registry->set(
+                    'model_csc_sms_attempt',
+                    new CscSmsAttemptModelStub(),
                 ),
                 default => null,
             };
@@ -782,6 +831,22 @@ csc_require_file_with_stripped_requires(
     ['csc_keycloak_provisioner.php'],
     CscEnrollmentRedirect::class,
 );
+if (! class_exists('ModelCscSmsAttempt', false)) {
+    class ModelCscSmsAttempt
+    {
+        public const CONTEXT_ENROLLMENT = 'enrollment';
+
+        public const CONTEXT_SIGNING = 'signing';
+
+        public const PROVIDER_SMSALERT = 'smsalert';
+
+        public const PROVIDER_WEB2SMS = 'web2sms';
+
+        public const SEND_SENT = 'sent';
+
+        public const SEND_FAILED = 'send_failed';
+    }
+}
 csc_require_controller_with_stripped_libs(
     'csc/enroll.php',
     ['csc_keycloak_provisioner.php', 'csc_enrollment_redirect.php'],

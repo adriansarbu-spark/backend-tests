@@ -47,6 +47,9 @@ function billing_me_fixture(array $dbRows = [], array $overrides = []): array
             'roleHasAuthenticationRights' => true,
             'rolesWithAuthenticationRights' => [],
         ]),
+        'sponsorship' => $overrides['sponsorship'] ?? new BillingModelStub([
+            'getActiveSponsorshipsForRole' => [],
+        ]),
         'price' => $overrides['price'] ?? new BillingModelStub([
             'getPriceProductDisplayRow' => static fn (int $priceId): array => [
                 'product_name' => 'Team',
@@ -62,6 +65,7 @@ function billing_me_fixture(array $dbRows = [], array $overrides = []): array
             'billing/role_entitlement_grant' => $models['grant'],
             'billing/role_entitlement_usage' => $models['usage'],
             'billing/entitlement_assignment' => $models['assignment'],
+            'partner/sponsorship' => $models['sponsorship'],
             'billing/price' => $models['price'],
         ],
         db: $db,
@@ -332,6 +336,7 @@ test('Billing me — an empty role still receives a stable snapshot', function (
         ],
         'subscriptions' => [],
         'current_plan' => null,
+        'sponsorships' => [],
     ]);
 });
 

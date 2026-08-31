@@ -123,16 +123,16 @@ test('CSC hosted enrollment — send_sms with an invalid phone returns 400 inval
  *
  * Steps:
  * 1. POST send_sms with a valid French mobile number.
- * 2. Assert 400 phone_number_not_ro.
+ * 2. Assert 400 phone_region_not_allowed.
  */
-test('CSC hosted enrollment — send_sms with a non-RO phone returns 400 phone_number_not_ro', function () {
+test('CSC hosted enrollment — send_sms with a non-RO phone returns 400 phone_region_not_allowed', function () {
     $session = csc_sms_session();
     [$c] = csc_hosted_enrollment_controller($session, 'send_sms');
     $c->setPostPayload(['phone' => '+33612345678']);
     $c->index();
 
     expect($c->statusCode)->toBe(400)
-        ->and($c->json['error'])->toBe(['phone_number_not_ro']);
+        ->and($c->json['error'])->toBe(['phone_region_not_allowed']);
 });
 
 /**

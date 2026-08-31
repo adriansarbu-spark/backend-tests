@@ -77,13 +77,13 @@ test('Team invitations API — non-admin role cannot list invitations', function
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $model = new TeamInvitationsModelStub();
     $customer = new TeamInvitationsAdminCustomerStub(1, 10, 5, 'employee');
-    [$registry, $load] = ti_registry_with_model($customer, $model);
+    [$registry, $load] = ti_registry_with_model($customer, $model, isCompanyAdmin: false);
     $c = ti_make_controller($registry);
     $c->index();
 
     expect($c->statusCode)->toBe(403)
         ->and($c->json['error'])->toBe(['admin_role_required'])
-        ->and($load->loadedModels)->toBe(['account/team_invitation']);
+        ->and($load->loadedModels)->toBe(['account/team_invitation', 'billing/entitlement_assignment']);
 });
 
 /**
@@ -110,7 +110,7 @@ test('Team invitations API — GET list allows case-variant Admin role and forwa
     $c->index();
 
     expect($c->statusCode)->toBe(200)
-        ->and($load->loadedModels)->toBe(['account/team_invitation'])
+        ->and($load->loadedModels)->toBe(['account/team_invitation', 'billing/entitlement_assignment'])
         ->and($model->lastInvitationsPagedArgs['include_history'])->toBeTrue()
         ->and($model->lastInvitationsPagedArgs['status'])->toBe('pending')
         ->and($c->json['data']['invitations'])->toHaveCount(1)

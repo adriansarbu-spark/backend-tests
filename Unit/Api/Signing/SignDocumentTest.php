@@ -31,6 +31,19 @@ beforeAll(function () {
 
 beforeEach(function () {
     $registry = new Registry();
+    $registry->set('config', new class {
+        public function load(string $key): void
+        {
+        }
+
+        public function get(string $key): mixed
+        {
+            return match ($key) {
+                'config_language_id' => 1,
+                default => null,
+            };
+        }
+    });
 
     /** @var TestableControllerPublicAPIV1Signing&MockObject $controller */
     $this->controller = $this->getMockBuilder(TestableControllerPublicAPIV1Signing::class)

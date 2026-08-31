@@ -160,6 +160,7 @@ test('Team invitations resend — non-admin role cannot resend', function () {
     [$registry, $load] = ti_registry_with_model(
         new TeamInvitationsAdminCustomerStub(1, 10, 5, 'employee'),
         $model,
+        isCompanyAdmin: false,
     );
     $c = ti_make_resend_controller($registry);
     $c->setPostPayload(['invitation_uuid' => 'u']);
@@ -167,7 +168,7 @@ test('Team invitations resend — non-admin role cannot resend', function () {
 
     expect($c->statusCode)->toBe(403)
         ->and($c->json['error'])->toBe(['admin_role_required'])
-        ->and($load->loadedModels)->toBe([]);
+        ->and($load->loadedModels)->toBe(['billing/entitlement_assignment']);
 });
 
 /**
@@ -188,7 +189,7 @@ test('Team invitations resend — missing or blank invitation_uuid returns 400',
 
     expect($c->statusCode)->toBe(400)
         ->and($c->json['error'])->toBe(['invitation_uuid_required'])
-        ->and($load->loadedModels)->toBe([]);
+        ->and($load->loadedModels)->toBe(['billing/entitlement_assignment']);
 })->with([
     'missing key' => [[]],
     'blank after trim' => [['invitation_uuid' => '  ']],
@@ -213,7 +214,7 @@ test('Team invitations resend — unknown UUID maps to 404 invitation_not_found'
 
     expect($c->statusCode)->toBe(404)
         ->and($c->json['error'])->toBe(['invitation_not_found'])
-        ->and($load->loadedModels)->toBe(['account/team_invitation'])
+        ->and($load->loadedModels)->toBe(['billing/entitlement_assignment', 'account/team_invitation'])
         ->and($model->lastValidateResendArgs)->toBe([33, 'missing-uuid']);
 });
 

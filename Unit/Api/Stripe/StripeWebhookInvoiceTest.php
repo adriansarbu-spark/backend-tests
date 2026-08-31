@@ -58,14 +58,14 @@ test('Stripe webhook — invoice line extraction normalizes modern pricing and p
         ],
     ]]];
 
-    $line = stripe_webhook_invoke($controller, 'extractFirstSubscriptionInvoiceLine', [$invoice]);
+    $line = stripe_webhook_invoke($controller, 'extractSubscriptionInvoiceLines', [$invoice]);
 
-    expect($line)->toBe([
+    expect($line)->toBe([[
         'stripe_price_id' => 'price_modern',
         'line_qty' => 1,
         'period_start' => 1767225600,
         'period_end' => 1769904000,
-    ]);
+    ]]);
 });
 
 /**

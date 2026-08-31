@@ -425,6 +425,27 @@ final class TeamInvitationsLanguageModelStub
     }
 }
 
+final class TeamInvitationsEntitlementAssignmentStub
+{
+    public function __construct(private readonly bool $isCompanyAdmin = true)
+    {
+    }
+
+    public function isRoleAdminForCompany(int $roleId, int $companyId): bool
+    {
+        return $this->isCompanyAdmin;
+    }
+}
+
+final class TeamInvitationsBrandingModelStub
+{
+    /** @return array{display_name: null, logo_url: null} */
+    public function getEmailBranding(int $companyId): array
+    {
+        return ['display_name' => null, 'logo_url' => null];
+    }
+}
+
 final class TeamInvitationsDbStub
 {
     /** @var list<string> */
@@ -466,6 +487,7 @@ final class TeamInvitationsLoadStub
     public function __construct(
         private readonly Registry $registry,
         private readonly TeamInvitationsModelStub $model,
+        private readonly TeamInvitationsEntitlementAssignmentStub $entitlementAssignment,
     ) {
     }
 
@@ -474,6 +496,10 @@ final class TeamInvitationsLoadStub
         $this->loadedModels[] = $route;
         if ($route === 'account/team_invitation') {
             $this->registry->set('model_account_team_invitation', $this->model);
+        } elseif ($route === 'billing/entitlement_assignment') {
+            $this->registry->set('model_billing_entitlement_assignment', $this->entitlementAssignment);
+        } elseif ($route === 'company/branding') {
+            $this->registry->set('model_company_branding', new TeamInvitationsBrandingModelStub());
         } elseif ($route === 'localisation/language') {
             $this->registry->set('model_localisation_language', new TeamInvitationsLanguageModelStub());
         }
@@ -497,9 +523,14 @@ function ti_registry_with_model(
     object $customer,
     TeamInvitationsModelStub $model,
     ?TeamInvitationsDbStub $db = null,
+    bool $isCompanyAdmin = true,
 ): array {
     $registry = new Registry();
-    $load = new TeamInvitationsLoadStub($registry, $model);
+    $load = new TeamInvitationsLoadStub(
+        $registry,
+        $model,
+        new TeamInvitationsEntitlementAssignmentStub($isCompanyAdmin),
+    );
     $db ??= new TeamInvitationsDbStub();
     $registry->set('load', $load);
     $registry->set('customer', $customer);

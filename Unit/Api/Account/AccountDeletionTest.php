@@ -175,6 +175,16 @@ function account_deletion_controller(int $customerId = 51, int $companyId = 0): 
 
     $registry->set('customer', new AccountDeletionCustomerStub($customerId, $companyId));
     $registry->set('load', $load);
+    $registry->set('config', new class {
+        public function load(string $key): void
+        {
+        }
+
+        public function get(string $key): mixed
+        {
+            return null;
+        }
+    });
 
     return [
         new TestableControllerPublicAPIV1AccountDeletion($registry),
