@@ -592,12 +592,15 @@ if (! class_exists(CscIntegratorDbStub::class)) {
     {
         public int $companyIdForClient = 88;
 
+        /** When false, GET_LOCK returns 0 (send-sms lock unavailable). */
+        public bool $grantSmsSendLock = true;
+
         public function query(string $sql): object
         {
             if (stripos($sql, 'GET_LOCK') !== false) {
                 return (object) [
                     'num_rows' => 1,
-                    'row'      => ['l' => 1],
+                    'row'      => ['l' => $this->grantSmsSendLock ? 1 : 0],
                     'rows'     => [],
                 ];
             }
@@ -634,9 +637,22 @@ if (! class_exists(CscIntegratorDbStub::class)) {
 if (! class_exists(CscSmsAttemptModelStub::class)) {
     final class CscSmsAttemptModelStub
     {
+        public int $countSentForContextResult = 0;
+
+        public int $countForContextResult = 0;
+
+        public int $countSentForContextCalls = 0;
+
         public function countSentForContext($context, $context_id): int
         {
-            return 0;
+            ++$this->countSentForContextCalls;
+
+            return $this->countSentForContextResult;
+        }
+
+        public function countForContext($context, $context_id): int
+        {
+            return $this->countForContextResult;
         }
     }
 }
@@ -663,6 +679,7 @@ if (! class_exists(CscIntegratorLoadStub::class)) {
             private readonly ?CscUploadSigningStub $upload = null,
             private readonly ?CscApiClientModelStub $apiClient = null,
             private readonly ?CscLegalDocumentModelStub $legalDocument = null,
+            private readonly ?CscSmsAttemptModelStub $smsAttempt = null,
         ) {
         }
 
@@ -710,7 +727,7 @@ if (! class_exists(CscIntegratorLoadStub::class)) {
                 ),
                 'csc/sms_attempt' => $this->registry->set(
                     'model_csc_sms_attempt',
-                    new CscSmsAttemptModelStub(),
+                    $this->smsAttempt ?? new CscSmsAttemptModelStub(),
                 ),
                 default => null,
             };
@@ -731,6 +748,7 @@ function csc_integrator_registry(
     ?CscApiClientModelStub $apiClient = null,
     array $config = [],
     ?CscLegalDocumentModelStub $legalDocument = null,
+    ?CscSmsAttemptModelStub $smsAttempt = null,
 ): array {
     $access = new CscCompanyAccessModelStub();
     $access->masterEnabled = true;
@@ -759,6 +777,7 @@ function csc_integrator_registry(
         $upload,
         $apiClient,
         $legalDocument,
+        $smsAttempt,
     );
     $registry->set('load', $load);
     $registry->set('config', new CscApiConfigStub(array_merge([
@@ -1108,11 +1127,31 @@ function csc_hosted_enrollment_controller(
     ?CscSignerModelStub $signer = null,
     ?CscApiClientModelStub $apiClient = null,
     array $config = [],
+    ?CscSmsAttemptModelStub $smsAttempt = null,
+    ?object $cache = null,
+    ?CscIntegratorDbStub $db = null,
 ): array {
     $enrollment = new CscEnrollmentSessionModelStub();
     $enrollment->byToken = $session;
     $signer ??= new CscSignerModelStub();
-    [$registry] = csc_integrator_registry($enrollment, $signer, null, null, null, null, $apiClient, $config);
+    [$registry] = csc_integrator_registry(
+        $enrollment,
+        $signer,
+        null,
+        null,
+        null,
+        null,
+        $apiClient,
+        $config,
+        null,
+        $smsAttempt,
+    );
+    if ($cache !== null) {
+        $registry->set('cache', $cache);
+    }
+    if ($db !== null) {
+        $registry->set('db', $db);
+    }
 
     $get = ['enrollment_token' => $token];
     if ($action !== '') {
