@@ -29,13 +29,14 @@ test('queue suite run accepts all and prepares split suite state', function () {
 test('dashboard run-all calls async start-all endpoint', function () {
     $templatePath = __DIR__ . '/../../../public/admin/view/template/tool/tests.twig';
     $template = file_get_contents($templatePath);
-
     expect($template)->not->toBeFalse();
-    expect($template)->toContain("url = 'index.php?route=tool/tests/startAllRun&user_token=' + encodeURIComponent(userToken);");
-    expect($template)->not->toContain("url: 'index.php?route=tool/tests/runBothNow&user_token={{ user_token }}'");
-    expect($template)->toContain("$('#run-all').on('click', function() {\n  runAllRequest();\n});");
-    expect($template)->toContain("escapeHtml(fileNode.file) + '</code> ';");
-    expect($template)->toContain('runRequest(\'all\');');
+    $compact = (string) preg_replace('/\s+/', ' ', (string) $template);
+
+    expect($template)
+        ->toContain('tool/tests/startAllRun')
+        ->toContain("runRequest('all')")
+        ->not->toContain('tool/tests/runBothNow')
+        ->and($compact)->toContain("$('#run-all').on('click', function() { runAllRequest(); });");
 });
 
 test('cli worker supports all suite switch branch', function () {

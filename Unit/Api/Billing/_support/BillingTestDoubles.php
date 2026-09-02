@@ -123,6 +123,35 @@ final class TestableControllerPublicapiv1BillingSeats extends ControllerPublicap
 final class TestableControllerPublicapiv1BillingSubscriptionItems extends ControllerPublicapiv1BillingSubscriptionItems
 {
     use BillingControllerHarness;
+
+    /** @var list<array{customer_id: int, context: string, success: bool, extra: array<string, mixed>}> */
+    public array $totpAudits = [];
+
+    /** @var list<int> */
+    public array $totpFailClears = [];
+
+    /**
+     * @param array<string, mixed> $extra
+     */
+    protected function auditTotpVerification($customer_id, $context, $success, array $extra = array())
+    {
+        $this->totpAudits[] = [
+            'customer_id' => (int) $customer_id,
+            'context' => (string) $context,
+            'success' => (bool) $success,
+            'extra' => $extra,
+        ];
+    }
+
+    protected function totpFailBlocked($owner_customer_id)
+    {
+        return false;
+    }
+
+    protected function totpFailClear($owner_customer_id)
+    {
+        $this->totpFailClears[] = (int) $owner_customer_id;
+    }
 }
 
 final class TestableControllerPublicapiv1BillingSubscriptions extends ControllerPublicapiv1BillingSubscriptions

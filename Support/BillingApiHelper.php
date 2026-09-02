@@ -223,6 +223,38 @@ final class BillingApiHelper
             ->and(self::joinedErrors($json))->not->toBe('');
     }
 
+    /**
+     * Local HTTP-guard failure: expected status, non-empty error, and no Stripe portal/session URL.
+     *
+     * @param array<string, mixed>|null $json
+     * @param int|list<int> $expectedStatus
+     */
+    public static function assertLocalGuardFailure(int $status, ?array $json, int|array $expectedStatus): void
+    {
+        self::assertFailure($status, $json, $expectedStatus);
+        $url = is_array($json) ? ($json['data']['url'] ?? null) : null;
+        expect($url === null || $url === '')->toBeTrue(
+            'Local billing guard leaked a Stripe portal URL. ' . self::debug($status, $json),
+        );
+    }
+
+    /**
+     * Portal (and similar) controllers check Stripe SDK/config before later local guards.
+     * Skip rather than fail when that bootstrap blocks the HTTP path under test.
+     *
+     * @param array<string, mixed>|null $json
+     */
+    public static function skipIfStripeBootstrapBlocks(int $status, ?array $json, string $raw = ''): void
+    {
+        if ($status !== 503) {
+            return;
+        }
+        test()->markTestSkipped(
+            'Stripe SDK or config is unavailable (HTTP 503); a later local guard cannot be reached over HTTP. '
+            . self::debug($status, $json, $raw),
+        );
+    }
+
     /** @param array<string, mixed>|null $json */
     public static function debug(int $status, ?array $json, string $raw = ''): string
     {

@@ -1,3 +1,5 @@
 test-pass-history.json
 tests_config.php
 coverage_report/*
+.cursor
+.cursor/*

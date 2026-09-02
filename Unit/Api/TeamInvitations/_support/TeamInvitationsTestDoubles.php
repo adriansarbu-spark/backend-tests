@@ -439,10 +439,19 @@ final class TeamInvitationsEntitlementAssignmentStub
 
 final class TeamInvitationsBrandingModelStub
 {
-    /** @return array{display_name: null, logo_url: null} */
-    public function getEmailBranding(int $companyId): array
+    /** Unbranded company: BrandingResolver treats null as the default Simplifi look. */
+    public function getForCompany(int $companyId): ?array
     {
-        return ['display_name' => null, 'logo_url' => null];
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed>|null $row
+     * @return array<string, mixed>|null
+     */
+    public function formatForApi($row): ?array
+    {
+        return null;
     }
 }
 

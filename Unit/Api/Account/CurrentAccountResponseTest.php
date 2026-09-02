@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../../tests_config.php';
 require_once DIR_SYSTEM . 'library/config.php';
-require_once PUBLIC_API . 'account.php';
+require_once __DIR__ . '/_support/AccountControllerBootstrap.php';
 
 final class CurrentAccountCustomerStub
 {

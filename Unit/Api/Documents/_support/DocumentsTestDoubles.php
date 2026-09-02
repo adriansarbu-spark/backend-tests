@@ -18,6 +18,13 @@ if (!defined('DB_PREFIX')) {
     define('DB_PREFIX', '');
 }
 
+// sendSignerEmail() calls BrandingResolver::emailSmartFields() in the same
+// expression as resolveDocumentOwnerBrand(), so PHP resolves the class before
+// that method's require_once runs. Unit tests do not load startup.php.
+if (!class_exists('BrandingResolver', false) && defined('DIR_SYSTEM')) {
+    require_once DIR_SYSTEM . 'library/branding_resolver.php';
+}
+
 if (!class_exists('ModelSigningSigner', false)) {
     class ModelSigningSigner {
         public const INVITATION_STANDARD = 'standard_invitation';
@@ -200,6 +207,17 @@ if (!class_exists(TestDocumentsEntitlementModel::class)) {
         public function chargeSponsoredSigningInvitationsForDocumentIfNeeded($companyId, $docId, $customerId, $flag, $roleId) { return ['ok' => true]; }
         public function getSimpleSignatureEnvelopesRemainingForCustomerRole($roleId) { return 10; }
         public function chargeSimpleSignaturePackOnDocumentCompleted($docId) {}
+        public function resolveDocumentOrganizationCompanyId($document) {
+            return (int)($document['owner_company_id'] ?? 0);
+        }
+        public function getCompanyIdForOwnerCustomerRoleId($ownerCustomerRoleId) { return 0; }
+    }
+}
+
+if (!class_exists(DocumentsBrandingModelStub::class)) {
+    class DocumentsBrandingModelStub {
+        public function getForCompany($companyId) { return null; }
+        public function formatForApi($row) { return null; }
     }
 }
 
@@ -543,9 +561,15 @@ function documents_test_controller(?object $customer = null): array
     $controller->allowedHeaders = null;
     $controller->integratorClientRow = null;
 
-    $controller->load = new class {
+    $controller->load = new class ($registry) {
         public array $loaded = [];
-        public function model(string $name): void { $this->loaded[] = $name; }
+        public function __construct(private Registry $registry) {}
+        public function model(string $name): void {
+            $this->loaded[] = $name;
+            if ($name === 'company/branding' && !$this->registry->has('model_company_branding')) {
+                $this->registry->set('model_company_branding', new DocumentsBrandingModelStub());
+            }
+        }
         public function language(string $name): void {}
         public function library(string $name): void {}
         public function controller(string $name): void {}
@@ -685,9 +709,15 @@ function buildDocumentsController(array $overrides = []): TestableControllerPubl
     $controller->allowedHeaders = null;
     $controller->integratorClientRow = null;
 
-    $controller->load = new class {
+    $controller->load = new class ($registry) {
         public array $loaded = [];
-        public function model(string $name): void { $this->loaded[] = $name; }
+        public function __construct(private Registry $registry) {}
+        public function model(string $name): void {
+            $this->loaded[] = $name;
+            if ($name === 'company/branding' && !$this->registry->has('model_company_branding')) {
+                $this->registry->set('model_company_branding', new DocumentsBrandingModelStub());
+            }
+        }
         public function language(string $name): void {}
         public function library(string $name): void {}
     };

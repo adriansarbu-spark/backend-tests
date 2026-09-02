@@ -21,7 +21,7 @@ afterEach(function () {
 
 /**
  * @param array<string, mixed>|object $post
- * @param array<string, object>      $overrides
+ * @param array<string, object>      $overrides Optional model stubs plus `customer` (BillingCustomerStub).
  *
  * @return array{0: TestableControllerPublicapiv1BillingSubscriptionItems, 1: array<string, BillingModelStub>}
  */
@@ -57,6 +57,7 @@ function billing_subscription_items_fixture(array|object $post, string $action =
     ];
     $route = 'publicapi/v1/billing/subscription_items' . ($action === '' ? '' : '/' . $action);
     [$registry] = billing_registry(
+        customer: $overrides['customer'] ?? null,
         models: [
             'billing/entitlement_assignment' => $models['assignment'],
             'billing/price' => $models['price'],
@@ -236,4 +237,51 @@ test('Billing subscription change — TOTP prerequisites and audit payload remai
         ])
         ->and($auditPayload)->not->toHaveKey('totp')
         ->and($auditPayload)->not->toHaveKey('totp_code');
+});
+
+/**
+ * Prerequisites:
+ * - A company admin has TOTP enrolled. The billing TOTP gate is exercised in
+ *   isolation (no Stripe session or line mutation).
+ *
+ * Steps:
+ * 1. Generate a current code from the enrolled secret.
+ * 2. Verify through both accepted body fields (`totp` and `totp_code`).
+ * 3. Assert the gate succeeds, the lockout counter is cleared, one success
+ *    audit is recorded per attempt, and neither the code nor the secret is stored.
+ */
+test('Billing subscription change — valid TOTP on a local mutation succeeds without exposing the secret', function () {
+    $secret = 'JBSWY3DPEHPK3PXP';
+    $code = (new \RobThree\Auth\TwoFactorAuth())->getCode($secret);
+    [$controller] = billing_subscription_items_fixture(
+        ['price_uuid' => '22222222-2222-4222-8222-222222222222'],
+        'preview',
+        ['customer' => new BillingCustomerStub(10, 20, 30, 'admin', '', '', $secret)],
+    );
+
+    $viaTotp = billing_invoke_private($controller, 'verifyBillingTotp', [['totp' => $code]]);
+    $viaAlias = billing_invoke_private($controller, 'verifyBillingTotp', [['totp_code' => $code]]);
+    $auditJson = json_encode($controller->totpAudits);
+
+    expect($viaTotp)->toMatchArray(['ok' => true, 'status_code' => 200, 'error' => ''])
+        ->and($viaAlias)->toMatchArray(['ok' => true, 'status_code' => 200, 'error' => ''])
+        ->and($controller->totpFailClears)->toBe([10, 10])
+        ->and($controller->totpAudits)->toHaveCount(2)
+        ->and($controller->totpAudits[0])->toMatchArray([
+            'customer_id' => 10,
+            'context' => 'billing_subscription_change',
+            'success' => true,
+            'extra' => [],
+        ])
+        ->and($controller->totpAudits[1])->toMatchArray([
+            'customer_id' => 10,
+            'context' => 'billing_subscription_change',
+            'success' => true,
+            'extra' => [],
+        ])
+        ->and($auditJson)->not->toContain($code)
+        ->and($auditJson)->not->toContain($secret)
+        ->and(\Stripe\Subscription::$updateCalls)->toBe([])
+        ->and(\Stripe\SubscriptionItem::$createCalls)->toBe([])
+        ->and(\Stripe\SubscriptionItem::$updateCalls)->toBe([]);
 });
