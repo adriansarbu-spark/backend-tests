@@ -592,20 +592,23 @@ if (! class_exists(CscIntegratorDbStub::class)) {
     {
         public int $companyIdForClient = 88;
 
-        /** When false, GET_LOCK returns 0 (send-sms lock unavailable). */
+        /**
+         * When false, DbMutex INSERT IGNORE reports 0 affected rows (send-sms
+         * lock already held). Instant, like the old GET_LOCK stub: pair with
+         * csc_enrollment_sms_lock_wait=0 so acquire does not poll for 10s.
+         */
         public bool $grantSmsSendLock = true;
+
+        private int $lastAffected = 0;
 
         public function query(string $sql): object
         {
-            if (stripos($sql, 'GET_LOCK') !== false) {
-                return (object) [
-                    'num_rows' => 1,
-                    'row'      => ['l' => $this->grantSmsSendLock ? 1 : 0],
-                    'rows'     => [],
-                ];
-            }
-            if (stripos($sql, 'RELEASE_LOCK') !== false) {
-                return (object) ['num_rows' => 1, 'row' => [], 'rows' => []];
+            $this->lastAffected = 0;
+
+            if (stripos($sql, 'INSERT IGNORE') !== false && stripos($sql, 'db_mutex') !== false) {
+                $this->lastAffected = $this->grantSmsSendLock ? 1 : 0;
+
+                return (object) ['num_rows' => 0, 'row' => [], 'rows' => []];
             }
             if (stripos($sql, 'csc_api_client') !== false && stripos($sql, 'SELECT') !== false) {
                 return (object) [
@@ -626,6 +629,11 @@ if (! class_exists(CscIntegratorDbStub::class)) {
         public function getLastId(): int
         {
             return 0;
+        }
+
+        public function countAffected(): int
+        {
+            return $this->lastAffected;
         }
     }
 }

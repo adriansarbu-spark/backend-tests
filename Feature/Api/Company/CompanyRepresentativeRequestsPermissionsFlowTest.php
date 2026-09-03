@@ -60,15 +60,16 @@ $pickUser1RequestUuid = static function (string $bearer1): string {
 
 /**
  * Prerequisites:
- * - Signed-in user B (`TEST_USER_2_*`) on their normal company session.
+ * - Signed-in user B (`TEST_USER_2_*`) on a **company** session (not the Pest.php personal-role baseline).
  *
  * Steps:
  * 1. **POST** `/publicapi/v1/company/representative-requests` with a dummy **`candidate_role_uuid`** and text fields (create is **admin-only**).
  * 2. If user B is **not** company admin, expect **HTTP 403** **`admin_role_required`**.
  * 3. If user B **is** company admin, the server may return **HTTP 404** **`candidate_role_not_found`** for a fake UUID in **their** company — either way the call must **not** succeed with **HTTP 200** (no silent cross-tenant create).
+ * 4. If user B has no company context, expect **HTTP 400** **`company_context_required`**.
  */
 test('Company representative-requests - POST create requires company admin or stays on own company scope', function () {
-    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
+    $bearer2 = CompanyRepresentativeApiHelper::bearerTokenForUser2CompanyContext();
     [$postSt, $postJson, $postRaw] = CompanyRepresentativeApiHelper::postJson(
         CompanyRepresentativeApiHelper::representativeRequestsUrl(),
         $bearer2,
@@ -81,7 +82,10 @@ test('Company representative-requests - POST create requires company admin or st
     $debug = 'status=' . $postSt . ' raw=' . substr($postRaw, 0, 700);
 
     expect($postSt)->not->toBe(200, 'POST create must not succeed without a valid admin workflow. ' . $debug);
-    expect(in_array($postSt, [403, 404], true))->toBeTrue($debug);
+    expect(in_array($postSt, [400, 403, 404], true))->toBeTrue($debug);
+    if ($postSt === 400) {
+        expect(CompanyRepresentativeApiHelper::joinedErrors($postJson))->toContain('company_context_required');
+    }
     if ($postSt === 403) {
         expect(CompanyRepresentativeApiHelper::joinedErrors($postJson))->toContain('admin_role_required');
     }
@@ -97,11 +101,11 @@ test('Company representative-requests - POST create requires company admin or st
  * Steps:
  * 1. Read a real **`request_uuid`** from user A’s list.
  * 2. As user B, **GET** `/publicapi/v1/company/representative-requests/{request_uuid}`.
- * 3. Expect **HTTP 404** **`user_not_found`** (no cross-tenant leakage).
+ * 3. Expect **HTTP 404** **`representative_request_not_found`** (no cross-tenant leakage).
  */
 test('Company representative-requests - outsider cannot load another company’s request by UUID', function () use ($pickUser1RequestUuid) {
     $bearer1 = CompanyRepresentativeApiHelper::bearerTokenForUser1AsCompanyRepresentative();
-    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
+    $bearer2 = CompanyRepresentativeApiHelper::bearerTokenForUser2CompanyContext();
 
     $reqUuid = $pickUser1RequestUuid($bearer1);
     if ($reqUuid === '') {
@@ -119,9 +123,7 @@ test('Company representative-requests - outsider cannot load another company’s
     }
 
     expect($status)->toBe(404, $debug);
-    if (is_array($json) && CompanyRepresentativeApiHelper::joinedErrors($json) !== '') {
-        expect(CompanyRepresentativeApiHelper::joinedErrors($json))->toContain('user_not_found');
-    }
+    expect(CompanyRepresentativeApiHelper::joinedErrors($json))->toContain('representative_request_not_found');
 });
 
 /**
@@ -130,11 +132,11 @@ test('Company representative-requests - outsider cannot load another company’s
  *
  * Steps:
  * 1. As user B, **POST** `/publicapi/v1/company/representative-requests/{request_uuid}/cancel`.
- * 2. Expect **not HTTP 200** — typically **HTTP 404** **`user_not_found`** or **HTTP 409** **`representative_request_not_cancellable`** if the row were somehow visible but not cancellable; must **not** return **HTTP 200** with **`cancelled`** true for another tenant’s row.
+ * 2. Expect **not HTTP 200** — typically **HTTP 404** **`representative_request_not_found`** or **HTTP 409** **`representative_request_not_cancellable`** when the row is not visible in B’s company; must **not** return **HTTP 200** with **`cancelled`** true for another tenant’s row.
  */
 test('Company representative-requests - outsider cannot cancel another company’s request by UUID', function () use ($pickUser1RequestUuid) {
     $bearer1 = CompanyRepresentativeApiHelper::bearerTokenForUser1AsCompanyRepresentative();
-    $bearer2 = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_2_EMAIL'), resolvedTestConfigValue('TEST_USER_2_PASSWORD'));
+    $bearer2 = CompanyRepresentativeApiHelper::bearerTokenForUser2CompanyContext();
 
     $reqUuid = $pickUser1RequestUuid($bearer1);
     if ($reqUuid === '') {
@@ -158,7 +160,7 @@ test('Company representative-requests - outsider cannot cancel another company�
         expect(CompanyRepresentativeApiHelper::joinedErrors($json))->toContain('admin_role_required');
     }
     if ($status === 404 && is_array($json) && CompanyRepresentativeApiHelper::joinedErrors($json) !== '') {
-        expect(CompanyRepresentativeApiHelper::joinedErrors($json))->toContain('user_not_found');
+        expect(CompanyRepresentativeApiHelper::joinedErrors($json))->toContain('representative_request_not_found');
     }
     if ($status === 409 && is_array($json) && CompanyRepresentativeApiHelper::joinedErrors($json) !== '') {
         expect(CompanyRepresentativeApiHelper::joinedErrors($json))->toContain('representative_request_not_cancellable');

@@ -18,13 +18,31 @@ final class CompanyRepresentativeApiHelper
     }
 
     /**
-     * GET single request — UUID must be in the `route` query value (see getRequestUuid()).
+     * Front-controller URL for a representative-requests sub-route.
+     *
+     * Pretty extra-path segments are not reliably rewritten into `request_uuid` on this
+     * host, and `HTTPS_SERVER` is the local catalog origin (wrong host when
+     * TEST_EXECUTOR=remote). Derive index.php from {@see resolveTestConfig('API_URL')}
+     * so UUID/action stay in `route` for getRequestUuid()/getRequestAction().
+     */
+    private static function representativeRequestsIndexRoute(string $suffix): string
+    {
+        $apiUrl = rtrim(resolveTestConfig('API_URL'), '/');
+        $origin = (string)preg_replace('#/publicapi/v1$#i', '', $apiUrl);
+        $route = 'publicapi/v1/company/representative_requests';
+        if ($suffix !== '') {
+            $route .= '/' . ltrim($suffix, '/');
+        }
+
+        return $origin . '/index.php?route=' . $route;
+    }
+
+    /**
+     * GET single request — UUID must stay in the `route` query value (see getRequestUuid()).
      */
     public static function representativeRequestDetailUrl(string $requestUuid): string
     {
-        $base = rtrim(HTTPS_SERVER, '/') . '/index.php';
-
-        return $base . '?route=publicapi/v1/company/representative_requests/' . rawurlencode($requestUuid);
+        return self::representativeRequestsIndexRoute(rawurlencode($requestUuid));
     }
 
     /**
@@ -32,12 +50,7 @@ final class CompanyRepresentativeApiHelper
      */
     public static function representativeRequestCancelUrl(string $requestUuid): string
     {
-        $base = rtrim(HTTPS_SERVER, '/') . '/index.php';
-
-        return $base
-            . '?route=publicapi/v1/company/representative_requests/'
-            . rawurlencode($requestUuid)
-            . '/cancel';
+        return self::representativeRequestsIndexRoute(rawurlencode($requestUuid) . '/cancel');
     }
 
     public static function representativesUrl(): string
@@ -106,6 +119,43 @@ final class CompanyRepresentativeApiHelper
     {
         self::assertRepresentativeCompanyConfigOrSkip();
         AccountCompaniesApiHelper::switchUser1ToCompanyRepresentativeRole($bearer);
+    }
+
+    /**
+     * Keycloak bearer for TEST_USER_2, switched off the Pest.php personal-role baseline
+     * onto the first non-personal company role when one exists.
+     */
+    public static function bearerTokenForUser2CompanyContext(): string
+    {
+        $bearer = ApiAuthHelper::bearerTokenFor(
+            resolvedTestConfigValue('TEST_USER_2_EMAIL'),
+            resolvedTestConfigValue('TEST_USER_2_PASSWORD')
+        );
+        [$status, $json] = AccountCompaniesApiHelper::get($bearer);
+        if ($status !== 200 || !is_array($json)) {
+            return $bearer;
+        }
+
+        foreach ((array)($json['data']['companies'] ?? []) as $company) {
+            if (!is_array($company) || !empty($company['is_personal'])) {
+                continue;
+            }
+            foreach ((array)($company['roles'] ?? []) as $role) {
+                if (!is_array($role)) {
+                    continue;
+                }
+                $roleUuid = trim((string)($role['role_uuid'] ?? ''));
+                if ($roleUuid === '') {
+                    continue;
+                }
+                [$switchStatus] = AccountCompaniesApiHelper::switchActiveRole($bearer, $roleUuid);
+                if ($switchStatus === 200) {
+                    return $bearer;
+                }
+            }
+        }
+
+        return $bearer;
     }
 
     /**

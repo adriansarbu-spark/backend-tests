@@ -236,8 +236,8 @@ test('CSC hosted enrollment — send_sms past the sliding-window rate limit retu
 
 /**
  * Prerequisites:
- * - Session otherwise eligible; GET_LOCK for the per-session send lock
- *   returns unavailable (concurrent send in progress).
+ * - Session otherwise eligible; DbMutex INSERT IGNORE for the per-session
+ *   send lock reports 0 affected rows (concurrent send in progress).
  *
  * Steps:
  * 1. POST send_sms.
@@ -253,7 +253,7 @@ test('CSC hosted enrollment — send_sms when the per-session send lock is unava
         'token-abc',
         null,
         null,
-        [],
+        ['csc_enrollment_sms_lock_wait' => 0],
         null,
         null,
         $db,

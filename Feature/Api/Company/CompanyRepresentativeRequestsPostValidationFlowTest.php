@@ -103,7 +103,7 @@ test('Company representative-requests - POST create rejects unknown candidate ro
  *
  * Steps:
  * 1. **GET** `/publicapi/v1/company/representative-requests/{uuid}` with a random UUID that does not exist for this company.
- * 2. Expect **HTTP 404** and **`user_not_found`**.
+ * 2. Expect **HTTP 404** and **`representative_request_not_found`**.
  */
 test('Company representative-requests - GET single returns 404 for unknown request UUID', function () {
     $bearer = CompanyRepresentativeApiHelper::bearerTokenForUser1AsCompanyRepresentative();
@@ -115,7 +115,5 @@ test('Company representative-requests - GET single returns 404 for unknown reque
     $debug = 'status=' . $status . ' raw=' . substr($raw, 0, 600);
 
     expect($status)->toBe(404, $debug);
-    if (is_array($json) && CompanyRepresentativeApiHelper::joinedErrors($json) !== '') {
-        expect(CompanyRepresentativeApiHelper::joinedErrors($json))->toContain('user_not_found');
-    }
+    expect(CompanyRepresentativeApiHelper::joinedErrors($json))->toContain('representative_request_not_found');
 });
