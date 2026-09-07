@@ -286,6 +286,28 @@ if (!class_exists(TestUploadModel::class)) {
     }
 }
 
+/**
+ * Verified login-email row for canActAsSignerAccess → isLoginEmailVerified().
+ * Production now requires customer_emails.email_verified=1 on the email match path.
+ */
+if (!class_exists(TestAccountCustomerEmailModel::class)) {
+    class TestAccountCustomerEmailModel {
+        /** @return array{email:string,email_verified:int}|null */
+        public function getCustomerEmail($customerId, $email)
+        {
+            $email = strtolower(trim((string) $email));
+            if ($email === '') {
+                return null;
+            }
+
+            return [
+                'email' => $email,
+                'email_verified' => 1,
+            ];
+        }
+    }
+}
+
 if (!class_exists(TestCustomer::class)) {
     class TestCustomer {
         public function getRoleId() {}

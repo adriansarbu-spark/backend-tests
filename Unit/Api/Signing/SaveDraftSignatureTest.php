@@ -24,16 +24,25 @@ beforeEach(function () {
     $this->signCode = 'c894afec-2494-4520-a8f3-ae05172356e0';
 
     // Minimal load stub; tests inject models directly.
-    $this->controller->load = new class {
+    $this->controller->load = new class ($this->controller) {
+        private $controller;
         public array $loaded = [];
+        public function __construct($controller)
+        {
+            $this->controller = $controller;
+        }
         public function model(string $name): void
         {
             $this->loaded[] = $name;
+            if ($name === 'account/customer') {
+                $this->controller->model_account_customer = new TestAccountCustomerEmailModel();
+            }
         }
     };
 
     $this->controller->customer = $this->createMock(TestCustomer::class);
     $this->controller->customer->method('getRoleId')->willReturn(10);
+    $this->controller->customer->method('getId')->willReturn(51);
 
     // Default apiRequest that is NOT json; tests override as needed.
     $this->controller->apiRequest = new class {

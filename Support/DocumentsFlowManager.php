@@ -43,7 +43,7 @@ final class DocumentsFlowManager
     /**
      * Initialize the flow exactly once:
      * - acquire bearer tokens for user1/user2
-     * - create a document owned by user1
+     * - create a document owned by user1 from TEST_SIGING_FILE
      *
      * This is intentionally stateful so multiple tests can share one created UUID.
      */

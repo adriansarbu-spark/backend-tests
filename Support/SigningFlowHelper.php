@@ -64,7 +64,7 @@ final class SigningFlowHelper
 
     public static function fixturePdfContent(): string
     {
-        return (string)file_get_contents(TEST_SIGING_FILE);
+        return DocumentsApiHelper::fixturePdfContent();
     }
 
     /**

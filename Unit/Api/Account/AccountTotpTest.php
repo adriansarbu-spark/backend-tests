@@ -188,7 +188,13 @@ test('Account TOTP API — setup confirm and disable complete the lifecycle with
         ->and($cache->deleted)->toContain('account_totp_disable_51')
         ->and($controller->totpAudits[1] ?? null)->toBe([51, 'totp_disable', true, []])
         ->and($controller->securityEvents[2] ?? null)->toBe([51, 'totp_disabled', []])
-        ->and($load->loadedModels)->toBe(['tool/validation', 'tool/validation', 'tool/validation']);
+        ->and($load->loadedModels)->toBe([
+            'certificate/certificate',
+            'tool/validation',
+            'certificate/certificate',
+            'tool/validation',
+            'tool/validation',
+        ]);
 });
 
 /**

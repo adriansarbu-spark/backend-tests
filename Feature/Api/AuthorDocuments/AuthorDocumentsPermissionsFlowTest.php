@@ -24,7 +24,8 @@ beforeAll(function () {
  *
  * Steps:
  * 1. **POST** create draft without an Authorization header.
- * 2. Access is refused (**HTTP 404**).
+ * 2. Expect refusal: **HTTP 401** with **`unauthenticated`** from the controller,
+ *    or **HTTP 404** when the gateway resolves “no user” first.
  */
 test('Author documents - creating a draft without a token is refused', function () {
     [$status, $json, $raw] = AuthorDocumentsApiHelper::postJson(
@@ -38,8 +39,13 @@ test('Author documents - creating a draft without a token is refused', function 
     );
 
     $debug = "Status={$status}\n" . substr((string)$raw, 0, 600);
-    expect($status)->toBe(404, "Expected unauthenticated create to fail.\n{$debug}");
+    expect(in_array($status, [401, 404], true))->toBeTrue(
+        "Expected unauthenticated create to fail.\n{$debug}"
+    );
     expect(AuthorDocumentsApiHelper::joinedErrors($json))->not->toBe('');
+    if ($status === 401) {
+        expect(AuthorDocumentsApiHelper::joinedErrors($json))->toContain('unauthenticated');
+    }
 });
 
 /**

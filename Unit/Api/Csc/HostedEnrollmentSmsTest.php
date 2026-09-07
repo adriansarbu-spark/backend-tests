@@ -253,7 +253,7 @@ test('CSC hosted enrollment — send_sms when the per-session send lock is unava
         'token-abc',
         null,
         null,
-        ['csc_enrollment_sms_lock_wait' => 0],
+        [],
         null,
         null,
         $db,

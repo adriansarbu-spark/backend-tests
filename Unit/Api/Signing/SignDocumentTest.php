@@ -110,6 +110,9 @@ beforeEach(function () {
             if ($name === 'signing/audit_event') {
                 $this->controller->model_signing_audit_event = new ModelSigningAuditEvent();
             }
+            if ($name === 'account/customer') {
+                $this->controller->model_account_customer = new TestAccountCustomerEmailModel();
+            }
         }
     };
 
@@ -144,6 +147,9 @@ beforeEach(function () {
     $this->controller->customer
         ->method('getRoleId')
         ->willReturn(10);
+    $this->controller->customer
+        ->method('getId')
+        ->willReturn(51);
     $this->controller->customer
         ->method('getFirstName')
         ->willReturn('Test');

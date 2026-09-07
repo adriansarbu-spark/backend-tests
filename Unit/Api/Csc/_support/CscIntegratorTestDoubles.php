@@ -594,8 +594,7 @@ if (! class_exists(CscIntegratorDbStub::class)) {
 
         /**
          * When false, DbMutex INSERT IGNORE reports 0 affected rows (send-sms
-         * lock already held). Instant, like the old GET_LOCK stub: pair with
-         * csc_enrollment_sms_lock_wait=0 so acquire does not poll for 10s.
+         * lock already held). DbMutex then polls for its wait budget (10s).
          */
         public bool $grantSmsSendLock = true;
 

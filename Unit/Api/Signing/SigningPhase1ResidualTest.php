@@ -253,6 +253,23 @@ final class Phase1SigningEntitlementStub
     }
 }
 
+final class Phase1SigningAccountCustomerStub
+{
+    /** @return array{email:string,email_verified:int}|null */
+    public function getCustomerEmail(int $customerId, string $email): ?array
+    {
+        $email = strtolower(trim($email));
+        if ($email === '') {
+            return null;
+        }
+
+        return [
+            'email' => $email,
+            'email_verified' => 1,
+        ];
+    }
+}
+
 final class Phase1SigningCertificateStub
 {
     /** @var array<string, mixed>|null */
@@ -403,6 +420,7 @@ function signing_phase1_controller(array $payload = []): array
         'tool/validation' => $validation,
         'billing/entitlement_signing' => $entitlement,
         'certificate/certificate' => $certificate,
+        'account/customer' => new Phase1SigningAccountCustomerStub(),
     ]));
     $controller = new Phase1SigningController($registry);
     $controller->useremail = 'principal@example.com';

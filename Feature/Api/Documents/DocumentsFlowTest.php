@@ -23,11 +23,11 @@ if (SKIP_INTEGRATION_TESTS) {
 }
 
 /**
- * Shared helper: one “documents” session for the whole file (log in test users once, create one sample document).
+ * Shared helper: one “documents” session for the whole file (log in test users once, upload TEST_SIGING_FILE).
  *
  * Steps (first time this runs in the process):
  * 1. Build a flow manager for the configured test users (`DocumentsFlowManager::forConfiguredTestUsers()`).
- * 2. Run `initialize()` so a real document exists and tokens are ready.
+ * 2. Run `initialize()` so a document from TEST_SIGING_FILE exists and tokens are ready.
  * 3. Return the same manager on later calls so tests do not repeat that setup.
  */
 function getDocumentsFlowManager(): DocumentsFlowManager
@@ -252,7 +252,7 @@ test('Documents — you cannot see another company document', function () {
  * - The server allows creating a new upload for this test (if uploads cannot be written, the helper may skip).
  *
  * Steps:
- * 1. Create a fresh document with a small PDF attached for the main user.
+ * 1. Create a fresh document with TEST_SIGING_FILE attached for the main user.
  * 2. Request the “download file” endpoint for that document as the owner.
  * 3. Check that the download succeeds (HTTP 200) and the bytes look like a real PDF (starts with `%PDF`).
  */
@@ -278,7 +278,7 @@ test('Documents — owner can download their PDF', function () {
  * - Two different test accounts can sign in.
  *
  * Steps:
- * 1. User B creates their own document with a PDF.
+ * 1. User B creates their own document with TEST_SIGING_FILE.
  * 2. User A (not the owner) tries to download B’s file using the same document id.
  * 3. Check that the download does not succeed as a normal file (not HTTP 200).
  * 4. If the server returns JSON with error details, check that an error message is present.
@@ -312,7 +312,7 @@ test('Documents — you cannot download another person’s PDF', function () {
  * - `resolvedTestConfigValue('TEST_USER_3_EMAIL')` and `resolvedTestConfigValue('TEST_USER_3_PASSWORD')` in `tests_config.php` point to a real “less verified” test account.
  *
  * Steps:
- * 1. Sign in as that third user and prepare a tiny PDF in memory.
+ * 1. Sign in as that third user and prepare the TEST_SIGING_FILE PDF.
  * 2. Upload it as a “qualified” document through the same API the app uses.
  * 3. Check that the HTTP status is one of: success (200), forbidden (403), or validation issue (422) — different environments may legitimately differ.
  * 4. If the upload succeeded (200), check that the response includes a new document id.
@@ -321,8 +321,9 @@ test('Documents — you cannot download another person’s PDF', function () {
 test('Documents — uncertified account may upload or be blocked (environment-specific)', function () {
     $user3Bearer = ApiAuthHelper::bearerTokenFor(resolvedTestConfigValue('TEST_USER_3_EMAIL'), resolvedTestConfigValue('TEST_USER_3_PASSWORD'));
 
-    $pdfContent = "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF";
+    $pdfContent = DocumentsApiHelper::fixturePdfContent();
     $documentName = 'Flow test uncertified qualified ' . gmdate('YmdHis');
+    $uploadFilename = basename((string)TEST_SIGING_FILE);
 
     [$status, $json, $raw] = DocumentsApiHelper::uploadDocumentForFlow(
         $user3Bearer,
@@ -330,7 +331,7 @@ test('Documents — uncertified account may upload or be blocked (environment-sp
         'QUALIFIED',
         $pdfContent,
         resolveTestConfig('API_URL') . 'documents',
-        'flow-test-user3.pdf'
+        $uploadFilename
     );
 
     $jsonText = is_array($json)

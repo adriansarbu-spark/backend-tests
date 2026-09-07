@@ -220,6 +220,27 @@ if (! class_exists(AccountTotpDbStub::class, false)) {
     }
 }
 
+if (! class_exists(AccountTotpCertificateModelStub::class, false)) {
+    final class AccountTotpCertificateModelStub
+    {
+        /** @var array<string, mixed>|null */
+        public ?array $customerData = [
+            'verification_status' => 'approved',
+        ];
+
+        /** @var list<int> */
+        public array $getCustomerDataCalls = [];
+
+        /** @return array<string, mixed>|null */
+        public function getCustomerData(int $customerId): ?array
+        {
+            $this->getCustomerDataCalls[] = $customerId;
+
+            return $this->customerData;
+        }
+    }
+}
+
 if (! class_exists(AccountTotpLoadStub::class, false)) {
     final class AccountTotpLoadStub
     {
@@ -229,6 +250,7 @@ if (! class_exists(AccountTotpLoadStub::class, false)) {
         public function __construct(
             private readonly Registry $registry,
             private readonly AccountTotpValidationModelStub $validationModel,
+            private readonly AccountTotpCertificateModelStub $certificateModel,
         ) {
         }
 
@@ -237,6 +259,9 @@ if (! class_exists(AccountTotpLoadStub::class, false)) {
             $this->loadedModels[] = $route;
             if ($route === 'tool/validation') {
                 $this->registry->set('model_tool_validation', $this->validationModel);
+            }
+            if ($route === 'certificate/certificate') {
+                $this->registry->set('model_certificate_certificate', $this->certificateModel);
             }
         }
     }
@@ -309,7 +334,8 @@ if (! function_exists('account_totp_controller')) {
      *     1: AccountTotpLoadStub,
      *     2: AccountTotpValidationModelStub,
      *     3: AccountApiCacheStub,
-     *     4: AccountTotpDbStub
+     *     4: AccountTotpDbStub,
+     *     5: AccountTotpCertificateModelStub
      * }
      */
     function account_totp_controller(
@@ -320,7 +346,8 @@ if (! function_exists('account_totp_controller')) {
     ): array {
         $registry = new Registry();
         $validationModel = new AccountTotpValidationModelStub();
-        $load = new AccountTotpLoadStub($registry, $validationModel);
+        $certificateModel = new AccountTotpCertificateModelStub();
+        $load = new AccountTotpLoadStub($registry, $validationModel, $certificateModel);
         $cache = new AccountApiCacheStub();
         $db = new AccountTotpDbStub();
 
@@ -346,6 +373,7 @@ if (! function_exists('account_totp_controller')) {
             $validationModel,
             $cache,
             $db,
+            $certificateModel,
         ];
     }
 }

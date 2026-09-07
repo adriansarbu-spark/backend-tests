@@ -30,13 +30,21 @@ beforeAll(function () {
  *
  * Steps:
  * 1. **GET** `/referrals` without an Authorization header.
- * 2. Access is refused (**HTTP 404**).
+ * 2. Expect refusal: **HTTP 401** with **`unauthenticated`** from the controller,
+ *    or **HTTP 404** with **`user_not_found`** when the gateway resolves “no user”
+ *    first (both mean “not signed in” for this environment).
  */
 test('Referrals - listing without a token is refused', function () {
     [$status, $json] = ReferralsApiHelper::getJson(ReferralsApiHelper::referralsUrl());
 
-    expect($status)->toBe(404);
-    expect(ReferralsApiHelper::joinedErrors($json))->not->toBe('');
+    expect(in_array($status, [401, 404], true))->toBeTrue(
+        'Expected refusal for GET without token (401 from controller or 404 user_not_found from gateway). status=' . $status
+    );
+    $err = ReferralsApiHelper::joinedErrors($json);
+    expect($err)->not->toBe('');
+    if ($status === 401) {
+        expect($err)->toContain('unauthenticated');
+    }
 });
 
 /**

@@ -75,6 +75,30 @@ final class DocumentsApiHelper
     }
 
     /**
+     * PDF bytes from TEST_SIGING_FILE (tests_config.php → FileSamples/sample.pdf).
+     *
+     * Skips when the constant or file is missing/unreadable so env misconfig
+     * does not look like an API failure.
+     */
+    public static function fixturePdfContent(): string
+    {
+        if (!defined('TEST_SIGING_FILE') || !is_string(TEST_SIGING_FILE) || trim(TEST_SIGING_FILE) === '') {
+            test()->markTestSkipped('Missing required test config constant: TEST_SIGING_FILE');
+        }
+
+        if (!is_file(TEST_SIGING_FILE) || !is_readable(TEST_SIGING_FILE)) {
+            test()->markTestSkipped('Missing or unreadable signing fixture PDF: ' . (string)TEST_SIGING_FILE);
+        }
+
+        $pdfContent = (string)file_get_contents(TEST_SIGING_FILE);
+        if ($pdfContent === '') {
+            test()->markTestSkipped('Signing fixture PDF is empty: ' . (string)TEST_SIGING_FILE);
+        }
+
+        return $pdfContent;
+    }
+
+    /**
      * Upload a document (multipart) for integration tests.
      *
      * Unlike createDocumentForFlow(), this method returns raw status/json/raw so
@@ -119,7 +143,7 @@ final class DocumentsApiHelper
     }
 
     /**
-     * Create a small in-memory PDF document for integration flows.
+     * Create a document from TEST_SIGING_FILE for integration flows.
      *
      * Endpoint: POST /publicapi/v1/documents
      * Rationale: centralizes upload payload + handles known environment failures
@@ -130,8 +154,9 @@ final class DocumentsApiHelper
     public static function createDocumentForFlow(string $userBearer, ?string $apiBase = null): array
     {
         $apiBase = $apiBase ?? (resolveTestConfig('API_URL') . 'documents');
-        $pdfContent = "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF";
+        $pdfContent = self::fixturePdfContent();
         $documentName = 'Flow test ' . gmdate('YmdHis');
+        $uploadFilename = basename((string)TEST_SIGING_FILE);
 
         [$createStatus, $createJson, $createRaw] = self::uploadDocumentForFlow(
             $userBearer,
@@ -139,7 +164,7 @@ final class DocumentsApiHelper
             'SIMPLE',
             $pdfContent,
             $apiBase,
-            'flow-test.pdf'
+            $uploadFilename
         );
 
         expect($createStatus)->toBe(200, 'Create response: ' . substr($createRaw, 0, 500));
