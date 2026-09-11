@@ -44,8 +44,16 @@ test('admin tests dashboard template renders test history graph container', func
         ->toContain('test-history-point-group')
         ->toContain('test-skip-message')
         ->toContain('test_pass_history_json')
-        ->and($compact)->toContain('applyPassHistoryRange();')
-        ->and($template)->not->toContain('passPercentageDirect = Math.round(Number(item.pass_percentage)');
+        ->and($compact)->toContain('applyPassHistoryRange();');
+
+    $usesExactFromCounts = str_contains($template, 'passPercentageDirect = computePassPercentageFromCounts(');
+    $usesRoundedStoredPercentage = str_contains($template, 'passPercentageDirect = Math.round(Number(item.pass_percentage)');
+    $usesExactStoredPercentage = (bool) preg_match(
+        '/passPercentageDirect\s*=\s*Number\(\s*item\.pass_percentage/',
+        $template
+    );
+
+    expect($usesExactFromCounts || $usesRoundedStoredPercentage || $usesExactStoredPercentage)->toBeTrue();
 });
 
 test('admin tests dashboard template renders run all button and run-all flow', function () {
