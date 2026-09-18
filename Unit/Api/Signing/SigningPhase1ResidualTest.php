@@ -213,6 +213,9 @@ final class Phase1SigningValidationStub
 {
     public int $recent = 0;
 
+    /** @var array<string, mixed>|null */
+    public ?array $recentSucceededProof = null;
+
     public function countRecentSignerClaimSends(int $customerId, string $email, int $window): int
     {
         return $this->recent;
@@ -226,6 +229,14 @@ final class Phase1SigningValidationStub
     public function getLatestSendTimestamp(int $customerId, string $email, string $type): ?int
     {
         return null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getRecentSucceededSignerClaimValidation(int $customerId, string $invitedEmail, int $days): ?array
+    {
+        return $this->recentSucceededProof;
     }
 }
 
