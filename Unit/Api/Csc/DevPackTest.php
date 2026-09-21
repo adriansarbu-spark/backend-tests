@@ -125,18 +125,28 @@ test('CSC dev pack — unsupported method returns 405', function () {
  * - Admin; no API client row.
  *
  * Steps:
- * 1. GET index().
- * 2. Assert 409 integration_not_provisioned.
+ * 1. GET index() with no item — static catalog is available without provisioning.
+ * 2. GET postman-environment and zip — assert 409 integration_not_provisioned.
  */
-test('CSC dev pack — missing integration returns 409', function () {
+test('CSC dev pack — missing integration returns 409 only for personalized items', function () {
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $client = new CscApiClientModelStub();
     $client->byCompany = null;
-    $c = csc_dev_pack_controller(new CscApiCustomerStub(1, 10, 5), $client);
-    $c->index();
+    $customer = new CscApiCustomerStub(1, 10, 5);
 
-    expect($c->statusCode)->toBe(409)
-        ->and($c->json['error'])->toBe(['integration_not_provisioned']);
+    $index = csc_dev_pack_controller($customer, $client);
+    $index->index();
+    expect($index->statusCode)->toBe(200)
+        ->and($index->json['data']['items'])->not->toBeEmpty();
+
+    foreach (['postman-environment', 'zip'] as $item) {
+        $c = csc_dev_pack_controller($customer, $client);
+        $c->request->get = ['dev_pack_item' => $item];
+        $c->index();
+
+        expect($c->statusCode)->toBe(409)
+            ->and($c->json['error'])->toBe(['integration_not_provisioned']);
+    }
 });
 
 /**
